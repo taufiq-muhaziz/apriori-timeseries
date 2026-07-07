@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard Utama{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="page-title">Website Analisis Data</h2>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card text-white border-0 p-4" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6) !important;">
+                <div class="card-body d-flex align-items-center justify-content-between flex-wrap">
+                    <div class="mb-3 mb-md-0">
+                        <span class="badge bg-white text-primary mb-2 fw-bold text-uppercase px-3 py-2">Sistem Siap Operasional</span>
+                        <h3 class="fw-bold mb-2">Selamat Datang di Website Komputasi</h3>
+                        <p class="mb-0 opacity-85">Implementasi algoritma keranjang belanjaan dan peramalan deret waktu secara simultan dalam satu dashboard.</p>
+                    </div>
+                    <div>
+                        <a href="/apriori" class="btn btn-light text-primary fw-bold px-4 py-2 shadow-sm transition-link">
+                            <i class="fas fa-play me-2"></i>Mulai Analisis Data
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-lg-4 mb-3">
+            <div class="kpi-card kpi-blue d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="kpi-title">Modul Market Basket</div>
+                    <div class="kpi-value my-2" style="font-size: 24px;">APRIORI</div>
+                    <small class="text-muted"><i class="fas fa-project-diagram text-primary me-1"></i>Pola asosiasi produk</small>
+                </div>
+                <div class="text-primary opacity-25"><i class="fas fa-shopping-basket fa-3x"></i></div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-3">
+            <div class="kpi-card kpi-green d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="kpi-title">Modul Prediktif</div>
+                    <div class="kpi-value my-2" style="font-size: 22px;">3 MODEL FORECAST</div>
+                    <small class="text-muted"><i class="fas fa-chart-line text-success me-1"></i>ARIMA, SARIMA, & Prophet</small>
+                </div>
+                <div class="text-success opacity-25"><i class="fas fa-chart-area fa-3x"></i></div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-3">
+            <div class="kpi-card kpi-orange d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="kpi-title">Output Sistem</div>
+                    <div class="kpi-value my-2" style="font-size: 24px;">DECISION MATRIX</div>
+                    <small class="text-muted"><i class="fas fa-brain text-warning me-1"></i>Rekomendasi stok otomatis</small>
+                </div>
+                <div class="text-warning opacity-25"><i class="fas fa-warehouse fa-3x"></i></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-lg-7 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-white py-3">
+                    <span class="text-primary fw-bold"><i class="fas fa-tasks me-2"></i>Aksi Cepat Navigasi Modul Utama</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center gap-3">
+                    <a href="/apriori" class="d-flex align-items-center p-3 bg-light rounded text-decoration-none text-dark border hover-shadow">
+                        <div class="bg-primary text-white p-3 rounded me-3"><i class="fas fa-calculator fa-fw"></i></div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Analisis Asosiasi Apriori</h6>
+                            <small class="text-muted">Memproses berkas transaksi untuk menemukan aturan asosiasi pola pembelian produk.</small>
+                        </div>
+                    </a>
+                    <a href="/timeseries" class="d-flex align-items-center p-3 bg-light rounded text-decoration-none text-dark border hover-shadow">
+                        <div class="bg-success text-white p-3 rounded me-3"><i class="fas fa-chart-line fa-fw"></i></div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Time Series Forecasting</h6>
+                            <small class="text-muted">Melakukan komputasi prediksi kuantitas penjualan dengan metode ARIMA, SARIMA, dan Prophet.</small>
+                        </div>
+                    </a>
+                    <a href="/recommendation" class="d-flex align-items-center p-3 bg-light rounded text-decoration-none text-dark border hover-shadow">
+                        <div class="bg-warning text-dark p-3 rounded me-3"><i class="fas fa-lightbulb fa-fw"></i></div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Matriks Rekomendasi Stok</h6>
+                            <small class="text-muted">Menghasilkan keputusan manajemen persediaan produk berdasarkan integrasi output algoritma.</small>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-white py-3">
+                    <span class="text-primary fw-bold"><i class="fas fa-info-circle me-2"></i>Ruang Lingkup Sistem</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between">
+                    <div class="p-3 bg-light rounded border mb-3">
+                        <h6 class="fw-bold text-secondary mb-2">Tujuan Aplikasi</h6>
+                        <p class="small text-muted mb-0 text-justify" style="line-height: 1.6;">
+                            Sistem komputasi ini dibangun untuk mengolah data riwayat transaksi penjualan ritel secara digital. Melalui pendekatan data-driven, sistem mengekstrak pengetahuan tersembunyi mengenai keterkaitan antar produk serta proyeksi angka kebutuhan stok barang di masa yang akan datang.
+                        </p>
+                    </div>
+                    <div class="p-3 bg-light rounded border">
+                        <h6 class="fw-bold text-secondary mb-2">Sumber Data Input</h6>
+                        <p class="small text-muted mb-0" style="line-height: 1.6;">
+                            Format berkas yang didukung oleh sistem pemrosesan ini wajib berupa file data berwujud koma atau komparasi sejenis bertipe format <strong>.CSV (Comma Separated Values)</strong>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <span class="text-primary fw-bold"><i class="fas fa-network-wired me-2"></i>Arsitektur Alur Pemrosesan Data Penelitian</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4 text-center py-2">
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded h-100 border transition-card">
+                                <div class="text-primary mb-2"><i class="fas fa-file-csv fa-2x"></i></div>
+                                <h6 class="fw-bold mb-1">1. Input Dataset</h6>
+                                <p class="small text-muted mb-0">User mengunggah file transaksi penjualan mentah berformat .csv ke dalam sistem.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded h-100 border transition-card">
+                                <div class="text-success mb-2"><i class="fas fa-filter fa-2x"></i></div>
+                                <h6 class="fw-bold mb-1">2. Analisis Apriori</h6>
+                                <p class="small text-muted mb-0">Mengekstrak aturan asosiasi untuk mengetahui kombinasi item yang dibeli bersamaan.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded h-100 border transition-card">
+                                <div class="text-warning mb-2"><i class="fas fa-history fa-2x"></i></div>
+                                <h6 class="fw-bold mb-1">3. Peramalan Deret Waktu</h6>
+                                <p class="small text-muted mb-0">Memproyeksikan kuantitas kebutuhan stok masa depan lewat ARIMA, SARIMA, & Prophet.</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded h-100 border transition-card">
+                                <div class="text-danger mb-2"><i class="fas fa-lightbulb fa-2x"></i></div>
+                                <h6 class="fw-bold mb-1">4. Hasil Rekomendasi</h6>
+                                <p class="small text-muted mb-0">Sistem memformulasikan aksi operasional: Restock, Maintain, atau Cuci Gudang.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-shadow {
+        transition: all 0.2s ease-in-out;
+    }
+    .hover-shadow:hover {
+        transform: translateX(4px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        background-color: #f8fafc !important;
+    }
+    .transition-card {
+        transition: transform 0.3s ease;
+    }
+    .transition-card:hover {
+        transform: translateY(-5px);
+    }
+    .text-justify {
+        text-align: justify;
+    }
+</style>
+{% endblock %}
