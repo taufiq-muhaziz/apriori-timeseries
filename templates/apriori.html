@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}Analisis Apriori{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="page-title">Analisis Pola Pembelian (Apriori)</h2>
+            <p class="page-subtitle">Implementasi algoritma Data Mining Market Basket Analysis untuk menemukan pola asosiasi antar produk.</p>
+        </div>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data">
+        <div class="row">
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100 shadow-sm border-0 bg-white">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <span class="text-primary fw-bold"><i class="fas fa-file-upload me-2"></i>Sumber Data Transaksi</span>
+                    </div>
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <p class="small text-muted mb-3">Silakan unggah berkas riwayat transaksi penjualan format .csv atau .xlsx bersih untuk memulai kalkulasi aturan asosiasi.</p>
+                        
+                        <div class="mb-3">
+                            <div class="upload-box p-4 text-center border rounded bg-light">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                <input type="file" name="file" class="form-control form-control-sm" accept=".csv, .xlsx, .xls" required>
+                                <div class="form-text mt-2 small">Mendukung format: .csv, .xlsx, .xls</div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">
+                            <i class="fas fa-cogs me-2"></i>Proses Algoritma Apriori
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8 mb-4">
+                <div class="card h-100 shadow-sm border-0 bg-white">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <span class="text-primary fw-bold"><i class="fas fa-sliders-h me-2"></i>Konfigurasi Batas Ambang Matematika</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-4">Atur batas minimum metrik pengujian secara dinamis untuk menyaring kualitas kekuatan kombinasi rule yang dihasilkan sistem.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-dark">Minimum Support (0.001 - 1.0)</label>
+                                <input type="number" step="0.001" min="0.001" max="1" name="min_support" class="form-control form-control-lg border-2" value="0.01" required>
+                                <div class="form-text text-justify small text-muted mt-2">Mengontrol seberapa sering kombinasi produk muncul dalam keseluruhan total transaksi belanja. (Disarankan: 0.01 untuk data bervariasi).</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-dark">Minimum Confidence (0.1 - 1.0)</label>
+                                <input type="number" step="0.01" min="0.01" max="1" name="min_confidence" class="form-control form-control-lg border-2" value="0.10" required>
+                                <div class="form-text text-justify small text-muted mt-2">Tolok ukur kepastian/probabilitas bersyarat transaksi. Jika membeli item A, seberapa besar peluang membeli item B.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% if rules_data %}
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="kpi-card kpi-blue shadow-sm">
+                <div class="kpi-title">Total Volume Transaksi</div>
+                <div class="kpi-value">{{ total_transactions }}</div>
+                <small class="text-muted"><i class="fas fa-check-circle text-success me-1"></i>Data berhasil diparsing</small>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="kpi-card kpi-green shadow-sm">
+                <div class="kpi-title">Total Unik Produk</div>
+                <div class="kpi-value">{{ total_products }}</div>
+                <small class="text-muted"><i class="fas fa-box text-primary me-1"></i>Item teridentifikasi</small>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="kpi-card kpi-orange shadow-sm">
+                <div class="kpi-title">Association Rules Terbentuk</div>
+                <div class="kpi-value">{{ total_rules }}</div>
+                <small class="text-muted"><i class="fas fa-filter text-warning me-1"></i>Sesuai nilai threshold</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <span class="text-primary fw-bold"><i class="fas fa-table me-2"></i>Matriks Hasil Komputasi Pola Asosiasi</span>
+                    <span class="badge bg-success px-3 py-2">Status: Selesai</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle border-light">
+                            <thead class="table-light text-secondary small">
+                                <tr>
+                                    <th>Antecedent (Jika Membeli)</th>
+                                    <th>Consequent (Maka Membeli)</th>
+                                    <th class="text-center">Support</th>
+                                    <th class="text-center">Confidence</th>
+                                    <th class="text-center">Lift Ratio</th>
+                                </tr>
+                            </thead>
+                            <tbody class="small">
+                                {% for rule in rules_data %}
+                                <tr>
+                                    <td><span class="badge bg-light text-dark border p-2 fw-semibold"><i class="fas fa-shopping-basket me-1 text-muted"></i>{{ rule.antecedent }}</span></td>
+                                    <td><span class="badge bg-light text-primary border p-2 fw-semibold"><i class="fas fa-plus-circle me-1 text-primary"></i>{{ rule.consequent }}</span></td>
+                                    <td class="text-center fw-semibold text-secondary">{{ rule.support }}</td>
+                                    <td class="text-center fw-semibold text-secondary">{{ rule.confidence }}</td>
+                                    <td class="text-center">
+                                        <span class="badge {% if rule.lift > 1 %}bg-light text-success border border-success{% else %}bg-light text-danger border border-danger{% endif %} px-3 py-2 fw-bold">
+                                            <i class="fas {% if rule.lift > 1 %}fa-arrow-up{% else %}fa-arrow-down{% endif %} me-1"></i>{{ rule.lift }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col-12 text-center py-5">
+            <div class="text-muted mb-3">
+                <i class="fas fa-folder-open fa-4x opacity-25"></i>
+            </div>
+            <h5 class="text-secondary fw-bold">Belum Ada Data yang Diproses</h5>
+            <p class="small text-muted">Gunakan panel konfigurasi di atas untuk mengunggah berkas transaksi penjualan baju fiktif/riil.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

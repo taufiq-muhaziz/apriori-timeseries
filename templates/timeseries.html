@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+
+{% block title %}Time Series Forecasting{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="fw-bold text-dark">Peramalan Deret Waktu (Time Series)</h2>
+            <p class="text-muted">Komparasi pemodelan prediktif kuantitas penjualan masa depan menggunakan algoritma ARIMA, SARIMA, dan Prophet.</p>
+        </div>
+    </div>
+
+    <form method="POST" action="/timeseries" enctype="multipart/form-data">
+        <div class="row mb-4">
+            <div class="col-lg-5 mb-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <span class="text-success fw-bold"><i class="fas fa-file-import me-2"></i>Sumber Data Tren</span>
+                    </div>
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <p class="small text-muted mb-3">Unggah dataset penjualan yang memiliki kolom <strong>'Date'</strong> dan <strong>'Qty'</strong>.</p>
+                        <div class="mb-3">
+                            <div class="upload-box p-4 text-center border rounded bg-light">
+                                <i class="fas fa-chart-line fa-3x text-success mb-3"></i>
+                                <input type="file" name="file" class="form-control form-control-sm" accept=".csv, .xlsx, .xls" required>
+                                <div class="form-text mt-2 small">Format berkas: .csv, .xlsx, .xls</div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 py-2 fw-bold shadow-sm">
+                            <i class="fas fa-magic me-2"></i>Jalankan Peramalan
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7 mb-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                        <span class="text-success fw-bold"><i class="fas fa-sliders-h me-2"></i>Parameter Prediksi (Otomatis 90 Hari)</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Musiman / Seasonality (Order S)</label>
+                                <input type="number" name="seasonality" class="form-control form-control-lg border-2" min="1" max="365" value="7" required>
+                                <div class="form-text small">Periode pola berulang (misal: 7 untuk mingguan).</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Horizon Peramalan Dasar</label>
+                                <input type="number" name="horizon" class="form-control form-control-lg border-2 bg-light" value="90" readonly>
+                                <div class="form-text small">Sistem dikunci untuk memproyeksikan 90 hari (3 gelombang momentum).</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% if forecast_data %}
+    <div class="row mb-3">
+        <div class="col-12 text-center">
+            <h6 class="fw-bold text-muted mb-2">Filter Gelombang Momentum:</h6>
+            <div class="btn-group shadow-sm" role="group">
+                <button type="button" class="btn btn-outline-success active" id="btn-sebelum" onclick="filterData('sebelum')">Sebelum Puasa (Hari 1-30)</button>
+                <button type="button" class="btn btn-outline-success" id="btn-puasa" onclick="filterData('puasa')">Saat Puasa (Hari 31-60)</button>
+                <button type="button" class="btn btn-outline-success" id="btn-setelah" onclick="filterData('setelah')">Setelah Lebaran (Hari 61-90)</button>
+                <button type="button" class="btn btn-outline-primary" id="btn-semua" onclick="filterData('semua')">Semua (90 Hari)</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3">
+                    <span class="text-success fw-bold"><i class="fas fa-chart-area me-2"></i>Visualisasi Perbandingan Tren Hasil Peramalan</span>
+                </div>
+                <div class="card-body">
+                    <div style="position: relative; height:350px; width:100%">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <span class="text-success fw-bold"><i class="fas fa-table me-2"></i>Lembar Hasil Komputasi Prediksi Kuantitas</span>
+                    <span class="badge bg-success px-3 py-2" id="table-badge">Menampilkan: Sebelum Puasa</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-hover align-middle border-light">
+                            <thead class="table-light text-secondary small" style="position: sticky; top: 0; z-index: 1;">
+                                <tr>
+                                    <th>Tanggal Proyeksi</th>
+                                    <th class="text-center">Prediksi ARIMA (Qty)</th>
+                                    <th class="text-center">Prediksi SARIMA (Qty)</th>
+                                    <th class="text-center">Prediksi Prophet (Qty)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="small" id="table-body">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Memuat seluruh data 90 hari ke dalam variabel JavaScript
+        const fullData = [
+            {% for row in forecast_data %}
+            { 
+                date: "{{ row.date }}", 
+                arima: {{ row.arima }}, 
+                sarima: {{ row.sarima }}, 
+                prophet: {{ row.prophet }} 
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        let myForecastChart;
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+            
+            // Inisialisasi Chart kosong dulu
+            myForecastChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'ARIMA Projections',
+                            data: [],
+                            borderColor: '#0284c7',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'SARIMA Projections (Seasonal)',
+                            data: [],
+                            borderColor: '#22c55e',
+                            backgroundColor: 'transparent',
+                            borderWidth: 3,
+                            tension: 0.2
+                        },
+                        {
+                            label: 'Facebook Prophet Projections',
+                            data: [],
+                            borderColor: '#eab308',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Volume Penjualan (Pcs)' } },
+                        x: { title: { display: true, text: 'Tanggal Masa Depan' } }
+                    }
+                }
+            });
+
+            // Tampilkan "Sebelum Puasa" (30 hari pertama) secara default saat halaman dimuat
+            filterData('sebelum');
+        });
+
+        // Fungsi interaktif untuk merubah Chart & Tabel
+        function filterData(period) {
+            let start = 0;
+            let end = fullData.length - 1;
+            let badgeText = "";
+
+            // Update status tombol (Visual Aktif)
+            ['sebelum', 'puasa', 'setelah', 'semua'].forEach(id => {
+                document.getElementById('btn-' + id).classList.remove('active');
+            });
+            document.getElementById('btn-' + period).classList.add('active');
+
+            // Logika Pemotongan Tanggal
+            if (period === 'sebelum') {
+                start = 0; 
+                end = 29;
+                badgeText = "Gelombang: Sebelum Puasa";
+            } else if (period === 'puasa') {
+                start = 30; 
+                end = 59;
+                badgeText = "Gelombang: Saat Puasa";
+            } else if (period === 'setelah') {
+                start = 60; 
+                end = 89;
+                badgeText = "Gelombang: Setelah Lebaran";
+            } else if (period === 'semua') {
+                start = 0; 
+                end = fullData.length - 1;
+                badgeText = "Menampilkan: Seluruh Proyeksi (90 Hari)";
+            }
+
+            // Mencegah error jika data ternyata kurang dari 90 hari
+            end = Math.min(end, fullData.length - 1);
+
+            // Ekstrak data yang dibutuhkan
+            const filtered = fullData.slice(start, end + 1);
+
+            // Update Grafik Chart.js
+            myForecastChart.data.labels = filtered.map(d => d.date);
+            myForecastChart.data.datasets[0].data = filtered.map(d => d.arima);
+            myForecastChart.data.datasets[1].data = filtered.map(d => d.sarima);
+            myForecastChart.data.datasets[2].data = filtered.map(d => d.prophet);
+            myForecastChart.update();
+
+            // Update Teks Badge
+            document.getElementById('table-badge').innerText = badgeText;
+
+            // Update Isi Tabel
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = ''; // Kosongkan tabel
+            
+            filtered.forEach(row => {
+                let tr = `<tr>
+                    <td><span class="fw-bold text-dark"><i class="far fa-calendar-alt me-2 text-muted"></i>${row.date}</span></td>
+                    <td class="text-center text-primary fw-semibold">${row.arima}</td>
+                    <td class="text-center text-success fw-semibold">${row.sarima}</td>
+                    <td class="text-center text-warning fw-semibold">${row.prophet}</td>
+                </tr>`;
+                tbody.innerHTML += tr;
+            });
+        }
+    </script>
+    {% else %}
+    <div class="row">
+        <div class="col-12 text-center py-5">
+            <div class="text-muted mb-3">
+                <i class="fas fa-history fa-4x opacity-25"></i>
+            </div>
+            <h5 class="text-secondary fw-bold">Belum Ada Peramalan yang Dieksekusi</h5>
+            <p class="small text-muted">Silakan unggah berkas penjualan di atas untuk memicu komputasi.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

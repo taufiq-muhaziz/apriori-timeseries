@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block title %}Tentang Penelitian{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="page-title">Tentang Penelitian</h2>
+            <p class="page-subtitle">Informasi detail mengenai pengembangan sistem dan metodologi skripsi.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title text-primary mb-3">
+                        <i class="fas fa-info-circle me-2"></i>Latar Belakang
+                    </h5>
+                    <p class="text-justify lh-lg">
+                        Sistem ini dikembangkan sebagai implementasi penelitian skripsi yang berfokus pada optimasi strategi penjualan. 
+                        Dengan menggabungkan analisis pola beli konsumen melalui <strong>Algoritma Apriori</strong> dan prediksi tren masa depan menggunakan berbagai metode <strong>Forecasting Time Series</strong>, 
+                        sistem ini diharapkan dapat memberikan wawasan strategis bagi manajemen dalam pengambilan keputusan stok dan promosi produk.
+                    </p>
+                    
+                    <div class="mt-4 p-3 bg-light border-start border-primary border-4 rounded">
+                        <small class="text-muted d-block mb-1">Tujuan Penelitian:</small>
+                        <span class="fw-bold">Transformasi data transaksi mentah menjadi informasi cerdas yang bernilai bisnis.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4 text-center">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <img src="{{ url_for('static', filename='img/Taufiq Muhaziz.jpeg') }}" 
+                             alt="Foto Taufiq Muhaziz" 
+                             class="rounded-circle img-thumbnail shadow-sm" 
+                             style="width: 150px; height: 150px; object-fit: cover;">
+                    </div>
+                    <h5 class="mb-1 fw-bold">Taufiq Muhaziz</h5>
+                    <p class="text-muted small mb-0">NIM: 221011400592</p>
+                    <p class="text-primary small mb-3">Teknik Informatika S1</p>
+                    <hr>
+                    <div class="text-start">
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Topik Penelitian:</small>
+                            <span class="small fw-600">Data Mining</span>
+                        </div>
+                        <div>
+                            <small class="text-muted d-block">Tahun Pengembangan:</small>
+                            <span class="small fw-600">2026</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h5 class="mb-3 mt-2"><i class="fas fa-microscope me-2 text-primary"></i>Metodologi yang Diimplementasikan</h5>
+    <div class="row g-3">
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-primary mb-2"><i class="fas fa-project-diagram fa-2x"></i></div>
+                    <h6 class="fw-bold">Apriori</h6>
+                    <p class="small text-muted mb-0">Digunakan untuk Market Basket Analysis (Analisis Pola Asosiasi Penjualan).</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-success mb-2"><i class="fas fa-chart-line fa-2x"></i></div>
+                    <h6 class="fw-bold">ARIMA</h6>
+                    <p class="small text-muted mb-0">Model statistik untuk peramalan data deret waktu (Forecasting).</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-warning mb-2"><i class="fas fa-calendar-check fa-2x"></i></div>
+                    <h6 class="fw-bold">SARIMA</h6>
+                    <p class="small text-muted mb-0">Pengembangan ARIMA dengan mempertimbangkan efek musiman (Seasonality).</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-danger mb-2"><i class="fas fa-magic fa-2x"></i></div>
+                    <h6 class="fw-bold">Prophet</h6>
+                    <p class="small text-muted mb-0">Prosedur peramalan otomatis buatan Facebook untuk data yang kompleks.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

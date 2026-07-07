@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}Rekomendasi Manajemen Stok{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="page-title">Sistem Pendukung Keputusan Persediaan Stok</h2>
+            <p class="page-subtitle">Rekomendasi otomatis berbasis integrasi Rules Apriori (Market Basket Analysis) dan Estimasi Tren Penjualan Multi-Model.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-white">
+                    <span class="text-primary fw-bold"><i class="fas fa-sync-alt me-2"></i>Sinkronisasi Hasil Analisis</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between">
+                    <p class="small text-muted mb-3">Unggah berkas kompilasi data hasil kalkulasi Apriori dan Time Series untuk merumuskan matriks keputusan manajemen persediaan.</p>
+                    
+                    <form method="POST" enctype="multipart/form-data" class="mt-auto">
+                        <div class="mb-3">
+                            <div class="upload-box p-4 text-center">
+                                <i class="fas fa-boxes fa-3x text-primary mb-3"></i>
+                                <input type="file" name="file" class="form-control form-control-sm" accept=".csv" required>
+                                <div class="form-text mt-2 small">Menerima format file ringkasan .csv</div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                            <i class="fas fa-calculator me-2"></i>Formulasikan Rekomendasi
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-white">
+                    <span class="text-primary fw-bold"><i class="fas fa-info-circle me-2"></i>Logika Aturan Keputusan (Rule-Based Matrix)</span>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">Sistem menetapkan status berdasarkan parameter kombinasi lintas algoritma berikut:</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm small mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Kondisi Tren (Forecasting)</th>
+                                    <th>Kondisi Asosiasi (Apriori)</th>
+                                    <th>Rekomendasi Aksi</th>
+                                    <th>Warna Indikator</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="text-success fw-bold">Tren Naik</span></td>
+                                    <td>Lift Ratio &gt; 1 (Sering Dibeli Bersama)</td>
+                                    <td><strong>Restock Agresif / Bundling Utama</strong></td>
+                                    <td><span class="badge bg-success">Hijau (Restock)</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="text-secondary fw-bold">Tren Stabil</span></td>
+                                    <td>Lift Ratio &gt; 1 atau Confidence Tinggi</td>
+                                    <td><strong>Pertahankan Stok / Stok Konvensional</strong></td>
+                                    <td><span class="badge bg-warning text-dark">Kuning (Maintain)</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="text-danger fw-bold">Tren Turun</span></td>
+                                    <td>Lift Ratio &lt; 1 (Jarang Terjual)</td>
+                                    <td><strong>Diskon Cuci Gudang / Hentikan Produksi</strong></td>
+                                    <td><span class="badge bg-danger">Merah (Oversupply)</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if recommendation_data %}
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-title">Total Produk Dievaluasi</div>
+                <div class="kpi-value">{{ total_items }}</div>
+                <small class="text-muted"><i class="fas fa-cube text-primary me-1"></i>Entitas SKU terdaftar</small>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="kpi-card kpi-green">
+                <div class="kpi-title">Aksi: Restock / Naikkan</div>
+                <div class="kpi-value">{{ count_restock }}</div>
+                <small class="text-muted"><i class="fas fa-arrow-up text-success me-1"></i>Permintaan diprediksi tinggi</small>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="kpi-card kpi-orange">
+                <div class="kpi-title">Aksi: Pertahankan</div>
+                <div class="kpi-value">{{ count_maintain }}</div>
+                <small class="text-muted"><i class="fas fa-minus-circle text-warning me-1"></i>Kondisi pasar stabil</small>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="kpi-card kpi-red">
+                <div class="kpi-title">Aksi: Cuci Gudang</div>
+                <div class="kpi-value">{{ count_danger }}</div>
+                <small class="text-muted"><i class="fas fa-exclamation-triangle text-danger me-1"></i>Risiko mengendap / dead stock</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span class="text-primary fw-bold"><i class="fas fa-clipboard-list me-2"></i>Daftar Prioritas Manajemen Persediaan Gudang</span>
+                    <span class="badge bg-dark">Metode: Integrasi Hasil Data Mining</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Nama Produk / Komoditas</th>
+                                    <th class="text-center">Prediksi Kuantitas (30 Hari)</th>
+                                    <th class="text-center">Asosiasi Terkuat</th>
+                                    <th class="text-center">Status Keputusan</th>
+                                    <th>Strategi Operasional Lapangan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in recommendation_data %}
+                                <tr>
+                                    <td><span class="fw-bold text-dark">{{ item.name }}</span></td>
+                                    <td class="text-center fw-semibold text-primary">{{ item.forecast_qty }} pcs</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-light text-dark border"><i class="fas fa-link me-1 text-muted"></i>{{ item.linked_item }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if item.status == 'Restock' %}
+                                        <span class="badge bg-success p-2 w-100"><i class="fas fa-arrow-circle-up me-1"></i> Restock</span>
+                                        {% elif item.status == 'Maintain' %}
+                                        <span class="badge bg-warning text-dark p-2 w-100"><i class="fas fa-pause-circle me-1"></i> Maintain</span>
+                                        {% else %}
+                                        <span class="badge bg-danger p-2 w-100"><i class="fas fa-arrow-circle-down me-1"></i> Cuci Gudang</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="small text-muted">{{ item.strategy }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col-12 text-center py-5">
+            <div class="text-muted mb-3">
+                <i class="fas fa-warehouse fa-4x opacity-50"></i>
+            </div>
+            <h5 class="text-secondary">Menunggu Integrasi Berkas Analisis</h5>
+            <p class="small text-muted">Silakan lakukan pengunggahan berkas gabungan untuk memicu matriks keputusan logistik.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
