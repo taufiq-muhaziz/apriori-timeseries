@@ -1,10 +1,9 @@
-os
-io
-base64
+Flask
 pandas
 numpy
-flask
 mlxtend
 statsmodels
 prophet
 matplotlib
+gunicorn
+openpyxl
