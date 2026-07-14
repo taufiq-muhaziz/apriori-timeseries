@@ -10,16 +10,28 @@ from statsmodels.tsa.arima.model import ARIMA
 
 
 app = Flask(__name__)
+print("=" * 60)
+print("APP YANG DIJALANKAN:")
+print(Path(__file__).resolve())
+
+print("FOLDER TEMPLATE YANG DIBACA:")
+print((Path(__file__).resolve().parent / "templates").resolve())
+
+print("FILE TIMESERIES YANG DIBACA:")
+print(
+    (
+        Path(__file__).resolve().parent
+        / "templates"
+        / "timeseries.html"
+    ).resolve()
+)
+print("=" * 60)
 app.secret_key = os.environ.get(
     "SECRET_KEY",
     "skripsi_apriori_timeseries"
 )
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
-
-# ============================================================
-# KONFIGURASI FOLDER DAN FILE
-# ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "output"
@@ -43,10 +55,6 @@ TOP_PRODUCTS = 50
 FORECAST_HORIZON = 90
 ARIMA_ORDER = (2, 1, 2)
 
-
-# ============================================================
-# FUNGSI UMUM
-# ============================================================
 
 def allowed_file(filename):
     return (
@@ -114,8 +122,7 @@ def numeric_series(series):
         .str.strip()
     )
 
-    # Jika angka memakai format Indonesia, misalnya 1.234,50
-    contains_comma = values.str.contains(",", regex=False, na=False)
+        contains_comma = values.str.contains(",", regex=False, na=False)
     contains_dot = values.str.contains(".", regex=False, na=False)
 
     indonesia_mask = contains_comma & contains_dot
@@ -151,10 +158,6 @@ def find_existing_file(filename):
     return None
 
 
-# ============================================================
-# EVALUASI MODEL
-# ============================================================
-
 def get_evaluation_data():
     """
     Nilai evaluasi berdasarkan hasil pengolahan offline penelitian.
@@ -189,10 +192,6 @@ def get_evaluation_data():
         }
     ]
 
-
-# ============================================================
-# PROSES TIME SERIES
-# ============================================================
 
 def validate_timeseries_dataset(data):
     data = normalize_columns(data)
@@ -431,9 +430,7 @@ def process_timeseries(data):
                 freq="D"
             )
 
-            # Nilai tidak ditambah noise/angka acak.
-            # Fluktuasi yang muncul berasal dari hasil model ARIMA.
-            rounded_prediction = np.round(
+                      rounded_prediction = np.round(
                 prediction,
                 2
             )
@@ -493,7 +490,6 @@ def process_timeseries(data):
         "ringkasan": summary_result,
         "produk_gagal": failed_products
     }
-
 
 def build_timeseries_context(
     daily_data,
@@ -615,7 +611,6 @@ def build_timeseries_context(
 
     selected_product = requested_product
 
-    # PENTING: kirim seluruh produk ke JavaScript.
     all_forecast_records = []
 
     sorted_daily_data = daily_data.sort_values(
@@ -749,10 +744,6 @@ def load_saved_timeseries_context(
         success_message=success_message
     )
 
-
-# ============================================================
-# PROSES APRIORI
-# ============================================================
 
 def process_apriori(
     data,
@@ -940,10 +931,6 @@ def process_apriori(
     }
 
 
-# ============================================================
-# PROSES REKOMENDASI
-# ============================================================
-
 def prepare_recommendation_data(data):
     data = normalize_columns(data)
 
@@ -1123,10 +1110,6 @@ def prepare_recommendation_data(data):
         )
     }
 
-
-# ============================================================
-# ROUTE FLASK
-# ============================================================
 
 @app.route("/")
 def dashboard():
