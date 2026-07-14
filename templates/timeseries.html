@@ -1,111 +1,426 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
-{% block title %}Time Series Forecasting{% endblock %}
+{% block title %}Time Series{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<style>
+    .ts-card {
+        border: 0;
+        border-radius: 16px;
+        background: #ffffff;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .ts-upload-area {
+        border: 2px dashed #b8c4d6;
+        border-radius: 14px;
+        background: #f8fafc;
+        padding: 28px;
+    }
+
+    .ts-section-title {
+        color: #173f8f;
+        font-weight: 700;
+    }
+
+    .ts-kpi {
+        height: 100%;
+        padding: 22px;
+        border-radius: 16px;
+        background: #ffffff;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .ts-kpi-label {
+        color: #64748b;
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+
+    .ts-kpi-value {
+        color: #173f8f;
+        font-size: 1.55rem;
+        font-weight: 700;
+        line-height: 1.2;
+        word-break: break-word;
+    }
+
+    .ts-kpi-note {
+        color: #94a3b8;
+        font-size: 0.8rem;
+        margin-top: 8px;
+    }
+
+    .ts-chart-wrapper {
+        position: relative;
+        width: 100%;
+        height: 390px;
+    }
+
+    .ts-table-scroll {
+        max-height: 560px;
+        overflow-y: auto;
+    }
+
+    .ts-sticky-head {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .ts-selected-row {
+        background-color: #dcfce7 !important;
+    }
+
+    .ts-empty-state {
+        border: 1px dashed #cbd5e1;
+        border-radius: 16px;
+        background: #ffffff;
+        padding: 48px 24px;
+        text-align: center;
+    }
+
+    @media (max-width: 768px) {
+        .ts-chart-wrapper {
+            height: 300px;
+        }
+
+        .ts-upload-area {
+            padding: 20px;
+        }
+    }
+</style>
+
+<div class="container-fluid py-2">
+
     <div class="row mb-4">
         <div class="col-12">
-            <h2 class="fw-bold text-dark">Peramalan Deret Waktu (Time Series)</h2>
-            <p class="text-muted">Komparasi pemodelan prediktif kuantitas penjualan masa depan menggunakan algoritma ARIMA, SARIMA, dan Prophet.</p>
+            <h2 class="page-title mb-2">
+                Analisis dan Prediksi Penjualan Time Series
+            </h2>
+
+            <p class="page-subtitle mb-0">
+                Unggah dataset penjualan mentah untuk memprediksi
+                seluruh produk atau maksimal 50 produk terlaris
+                selama 90 hari menggunakan ARIMA.
+            </p>
         </div>
     </div>
 
-    <form method="POST" action="/timeseries" enctype="multipart/form-data">
-        <div class="row mb-4">
-            <div class="col-lg-5 mb-3">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header bg-white py-3 border-bottom">
-                        <span class="text-success fw-bold"><i class="fas fa-file-import me-2"></i>Sumber Data Tren</span>
-                    </div>
-                    <div class="card-body d-flex flex-column justify-content-between">
-                        <p class="small text-muted mb-3">Unggah dataset penjualan yang memiliki kolom <strong>'Date'</strong> dan <strong>'Qty'</strong>.</p>
-                        <div class="mb-3">
-                            <div class="upload-box p-4 text-center border rounded bg-light">
-                                <i class="fas fa-chart-line fa-3x text-success mb-3"></i>
-                                <input type="file" name="file" class="form-control form-control-sm" accept=".csv, .xlsx, .xls" required>
-                                <div class="form-text mt-2 small">Format berkas: .csv, .xlsx, .xls</div>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-success w-100 py-2 fw-bold shadow-sm">
-                            <i class="fas fa-magic me-2"></i>Jalankan Peramalan
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-7 mb-3">
-                <div class="card h-100 shadow-sm border-0">
-                    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                        <span class="text-success fw-bold"><i class="fas fa-sliders-h me-2"></i>Parameter Prediksi (Otomatis 90 Hari)</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Musiman / Seasonality (Order S)</label>
-                                <input type="number" name="seasonality" class="form-control form-control-lg border-2" min="1" max="365" value="7" required>
-                                <div class="form-text small">Periode pola berulang (misal: 7 untuk mingguan).</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold">Horizon Peramalan Dasar</label>
-                                <input type="number" name="horizon" class="form-control form-control-lg border-2 bg-light" value="90" readonly>
-                                <div class="form-text small">Sistem dikunci untuk memproyeksikan 90 hari (3 gelombang momentum).</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </form>
-
-    {% if forecast_data %}
-    <div class="row mb-3">
-        <div class="col-12 text-center">
-            <h6 class="fw-bold text-muted mb-2">Filter Gelombang Momentum:</h6>
-            <div class="btn-group shadow-sm" role="group">
-                <button type="button" class="btn btn-outline-success active" id="btn-sebelum" onclick="filterData('sebelum')">Sebelum Puasa (Hari 1-30)</button>
-                <button type="button" class="btn btn-outline-success" id="btn-puasa" onclick="filterData('puasa')">Saat Puasa (Hari 31-60)</button>
-                <button type="button" class="btn btn-outline-success" id="btn-setelah" onclick="filterData('setelah')">Setelah Lebaran (Hari 61-90)</button>
-                <button type="button" class="btn btn-outline-primary" id="btn-semua" onclick="filterData('semua')">Semua (90 Hari)</button>
-            </div>
-        </div>
-    </div>
-
+    <!-- UPLOAD DATASET -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white py-3">
-                    <span class="text-success fw-bold"><i class="fas fa-chart-area me-2"></i>Visualisasi Perbandingan Tren Hasil Peramalan</span>
+            <div class="card ts-card">
+                <div class="card-header bg-white border-0 px-4 pt-4 pb-2">
+                    <h5 class="ts-section-title mb-1">
+                        <i class="fas fa-file-upload me-2"></i>
+                        Upload Dataset Time Series
+                    </h5>
+
+                    <p class="small text-muted mb-0">
+                        Kolom wajib: Date, Product_Name, dan Qty.
+                    </p>
                 </div>
-                <div class="card-body">
-                    <div style="position: relative; height:350px; width:100%">
-                        <canvas id="forecastChart"></canvas>
+
+                <div class="card-body px-4 pb-4">
+                    <form
+                        method="POST"
+                        action="{{ url_for('timeseries') }}"
+                        enctype="multipart/form-data"
+                    >
+                        <div class="row g-4 align-items-stretch">
+                            <div class="col-lg-8">
+                                <div class="ts-upload-area h-100">
+                                    <div class="text-center mb-3">
+                                        <i class="fas fa-file-csv fa-3x text-success"></i>
+                                    </div>
+
+                                    <label
+                                        for="timeseries-file"
+                                        class="form-label fw-bold"
+                                    >
+                                        Pilih File CSV
+                                    </label>
+
+                                    <input
+                                        id="timeseries-file"
+                                        type="file"
+                                        name="file"
+                                        class="form-control"
+                                        accept=".csv,text/csv"
+                                        required
+                                    >
+
+                                    <div
+                                        id="selected-file-name"
+                                        class="small text-primary fw-semibold mt-3"
+                                    ></div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-4">
+                                <div class="border rounded-4 p-4 h-100 bg-light">
+                                    <div class="d-flex justify-content-between border-bottom py-2">
+                                        <span class="text-muted">Model</span>
+                                        <strong>ARIMA (2,1,2)</strong>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between border-bottom py-2">
+                                        <span class="text-muted">Produk</span>
+                                        <strong>Maksimal 50</strong>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between py-2">
+                                        <span class="text-muted">Prediksi</span>
+                                        <strong>90 hari</strong>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        class="btn btn-success w-100 mt-4 py-2 fw-bold"
+                                    >
+                                        <i class="fas fa-chart-line me-2"></i>
+                                        Proses Semua Produk
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if success_message %}
+    <div class="alert alert-success shadow-sm border-0 mb-4">
+        <i class="fas fa-circle-check me-2"></i>
+        {{ success_message }}
+    </div>
+    {% endif %}
+
+    {% if error_message %}
+    <div class="alert alert-danger shadow-sm border-0 mb-4">
+        <div class="fw-bold">
+            <i class="fas fa-circle-exclamation me-2"></i>
+            Proses Time Series Gagal
+        </div>
+
+        <div class="small mt-1">
+            {{ error_message }}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if summary_data %}
+
+    <!-- PILIH PRODUK: LANGSUNG MENGUBAH GRAFIK -->
+    <div class="row mb-4" id="pilih-produk">
+        <div class="col-12">
+            <div
+                class="card ts-card"
+                style="border: 2px solid #2563eb;"
+            >
+                <div class="card-header bg-primary text-white border-0 px-4 py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-hand-pointer me-2"></i>
+                        PILIH PRODUK UNTUK MENGUBAH GRAFIK
+                    </h5>
+                </div>
+
+                <div class="card-body px-4 py-4">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-9">
+                            <label
+                                for="product-selector"
+                                class="form-label fw-bold"
+                            >
+                                Nama Produk
+                            </label>
+
+                            <select
+                                id="product-selector"
+                                class="form-select form-select-lg"
+                            >
+                                {% for product in product_list %}
+                                <option
+                                    value="{{ product }}"
+                                    {% if product == selected_product %}
+                                    selected
+                                    {% endif %}
+                                >
+                                    {{ product }}
+                                </option>
+                                {% endfor %}
+                            </select>
+
+                            <div class="form-text mt-2">
+                                Pilih Kaos, Celana Formal, Kemeja, atau produk
+                                lainnya. Grafik dan tabel akan berubah langsung
+                                tanpa upload ulang.
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <button
+                                type="button"
+                                id="show-product-button"
+                                class="btn btn-primary btn-lg w-100"
+                            >
+                                <i class="fas fa-chart-line me-2"></i>
+                                Tampilkan Grafik
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                    <span class="text-success fw-bold"><i class="fas fa-table me-2"></i>Lembar Hasil Komputasi Prediksi Kuantitas</span>
-                    <span class="badge bg-success px-3 py-2" id="table-badge">Menampilkan: Sebelum Puasa</span>
+    <!-- KPI -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="ts-kpi">
+                <div class="ts-kpi-label">
+                    Jumlah Produk
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                        <table class="table table-hover align-middle border-light">
-                            <thead class="table-light text-secondary small" style="position: sticky; top: 0; z-index: 1;">
+
+                <div class="ts-kpi-value">
+                    {{ total_products }}
+                </div>
+
+                <div class="ts-kpi-note">
+                    Seluruh produk berhasil diprediksi
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="ts-kpi">
+                <div class="ts-kpi-label">
+                    Produk yang Ditampilkan
+                </div>
+
+                <div
+                    id="selected-product-name"
+                    class="ts-kpi-value"
+                    style="font-size: 1.25rem;"
+                >
+                    {{ selected_product }}
+                </div>
+
+                <div class="ts-kpi-note">
+                    Pilihan dropdown saat ini
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="ts-kpi">
+                <div class="ts-kpi-label">
+                    Prediksi 90 Hari
+                </div>
+
+                <div
+                    id="selected-product-total"
+                    class="ts-kpi-value"
+                >
+                    {{ "%.2f"|format(prediksi_total_terpilih|float) }}
+                </div>
+
+                <div class="ts-kpi-note">
+                    Total produk terpilih
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="ts-kpi">
+                <div class="ts-kpi-label">
+                    Jumlah Prediksi Harian
+                </div>
+
+                <div
+                    id="selected-daily-total"
+                    class="ts-kpi-value"
+                >
+                    {{ "%.2f"|format(jumlah_harian|float) }}
+                </div>
+
+                <div class="ts-kpi-note">
+                    Akumulasi 90 data harian
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EVALUASI MODEL -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card ts-card">
+                <div class="card-header bg-white border-0 px-4 pt-4 pb-2">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="ts-section-title mb-0">
+                            <i class="fas fa-scale-balanced me-2"></i>
+                            Ringkasan Evaluasi Model
+                        </h5>
+
+                        <span class="badge bg-success px-3 py-2">
+                            Model Terbaik: ARIMA
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card-body px-4 pb-4">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover align-middle mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Tanggal Proyeksi</th>
-                                    <th class="text-center">Prediksi ARIMA (Qty)</th>
-                                    <th class="text-center">Prediksi SARIMA (Qty)</th>
-                                    <th class="text-center">Prediksi Prophet (Qty)</th>
+                                    <th class="text-center">Peringkat</th>
+                                    <th>Model</th>
+                                    <th class="text-center">MAE</th>
+                                    <th class="text-center">RMSE</th>
+                                    <th class="text-center">MAPE (%)</th>
+                                    <th class="text-center">Keterangan</th>
                                 </tr>
                             </thead>
-                            <tbody class="small" id="table-body">
-                                </tbody>
+
+                            <tbody>
+                                {% for item in evaluation_data %}
+                                <tr>
+                                    <td class="text-center">
+                                        {{ item.rank }}
+                                    </td>
+
+                                    <td class="fw-bold">
+                                        {{ item.model }}
+                                    </td>
+
+                                    <td class="text-center">
+                                        {{ "%.2f"|format(item.mae|float) }}
+                                    </td>
+
+                                    <td class="text-center">
+                                        {{ "%.2f"|format(item.rmse|float) }}
+                                    </td>
+
+                                    <td class="text-center">
+                                        {{ "%.2f"|format(item.mape|float) }}
+                                    </td>
+
+                                    <td class="text-center">
+                                        {% if item.model == "ARIMA" %}
+                                        <span class="badge bg-success">
+                                            {{ item.status }}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">
+                                            {{ item.status }}
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -113,146 +428,587 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        // Memuat seluruh data 90 hari ke dalam variabel JavaScript
-        const fullData = [
-            {% for row in forecast_data %}
-            { 
-                date: "{{ row.date }}", 
-                arima: {{ row.arima }}, 
-                sarima: {{ row.sarima }}, 
-                prophet: {{ row.prophet }} 
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-        ];
+    {% if forecast_data %}
 
-        let myForecastChart;
+    <!-- FILTER PERIODE -->
+    <div class="row mb-3" id="hasil-grafik">
+        <div class="col-12">
+            <div class="d-flex flex-wrap justify-content-center gap-2">
+                <button
+                    type="button"
+                    class="btn btn-outline-primary period-button active"
+                    data-start="0"
+                    data-end="30"
+                    data-label="Hari 1–30"
+                >
+                    Hari 1–30
+                </button>
 
-        document.addEventListener("DOMContentLoaded", function () {
-            const ctx = document.getElementById('forecastChart').getContext('2d');
-            
-            // Inisialisasi Chart kosong dulu
-            myForecastChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [
-                        {
-                            label: 'ARIMA Projections',
-                            data: [],
-                            borderColor: '#0284c7',
-                            backgroundColor: 'transparent',
-                            borderWidth: 2,
-                            tension: 0.2
-                        },
-                        {
-                            label: 'SARIMA Projections (Seasonal)',
-                            data: [],
-                            borderColor: '#22c55e',
-                            backgroundColor: 'transparent',
-                            borderWidth: 3,
-                            tension: 0.2
-                        },
-                        {
-                            label: 'Facebook Prophet Projections',
-                            data: [],
-                            borderColor: '#eab308',
-                            backgroundColor: 'transparent',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            tension: 0.2
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { position: 'top' } },
-                    scales: {
-                        y: { beginAtZero: true, title: { display: true, text: 'Volume Penjualan (Pcs)' } },
-                        x: { title: { display: true, text: 'Tanggal Masa Depan' } }
-                    }
-                }
-            });
+                <button
+                    type="button"
+                    class="btn btn-outline-primary period-button"
+                    data-start="30"
+                    data-end="60"
+                    data-label="Hari 31–60"
+                >
+                    Hari 31–60
+                </button>
 
-            // Tampilkan "Sebelum Puasa" (30 hari pertama) secara default saat halaman dimuat
-            filterData('sebelum');
-        });
+                <button
+                    type="button"
+                    class="btn btn-outline-primary period-button"
+                    data-start="60"
+                    data-end="90"
+                    data-label="Hari 61–90"
+                >
+                    Hari 61–90
+                </button>
 
-        // Fungsi interaktif untuk merubah Chart & Tabel
-        function filterData(period) {
-            let start = 0;
-            let end = fullData.length - 1;
-            let badgeText = "";
-
-            // Update status tombol (Visual Aktif)
-            ['sebelum', 'puasa', 'setelah', 'semua'].forEach(id => {
-                document.getElementById('btn-' + id).classList.remove('active');
-            });
-            document.getElementById('btn-' + period).classList.add('active');
-
-            // Logika Pemotongan Tanggal
-            if (period === 'sebelum') {
-                start = 0; 
-                end = 29;
-                badgeText = "Gelombang: Sebelum Puasa";
-            } else if (period === 'puasa') {
-                start = 30; 
-                end = 59;
-                badgeText = "Gelombang: Saat Puasa";
-            } else if (period === 'setelah') {
-                start = 60; 
-                end = 89;
-                badgeText = "Gelombang: Setelah Lebaran";
-            } else if (period === 'semua') {
-                start = 0; 
-                end = fullData.length - 1;
-                badgeText = "Menampilkan: Seluruh Proyeksi (90 Hari)";
-            }
-
-            // Mencegah error jika data ternyata kurang dari 90 hari
-            end = Math.min(end, fullData.length - 1);
-
-            // Ekstrak data yang dibutuhkan
-            const filtered = fullData.slice(start, end + 1);
-
-            // Update Grafik Chart.js
-            myForecastChart.data.labels = filtered.map(d => d.date);
-            myForecastChart.data.datasets[0].data = filtered.map(d => d.arima);
-            myForecastChart.data.datasets[1].data = filtered.map(d => d.sarima);
-            myForecastChart.data.datasets[2].data = filtered.map(d => d.prophet);
-            myForecastChart.update();
-
-            // Update Teks Badge
-            document.getElementById('table-badge').innerText = badgeText;
-
-            // Update Isi Tabel
-            const tbody = document.getElementById('table-body');
-            tbody.innerHTML = ''; // Kosongkan tabel
-            
-            filtered.forEach(row => {
-                let tr = `<tr>
-                    <td><span class="fw-bold text-dark"><i class="far fa-calendar-alt me-2 text-muted"></i>${row.date}</span></td>
-                    <td class="text-center text-primary fw-semibold">${row.arima}</td>
-                    <td class="text-center text-success fw-semibold">${row.sarima}</td>
-                    <td class="text-center text-warning fw-semibold">${row.prophet}</td>
-                </tr>`;
-                tbody.innerHTML += tr;
-            });
-        }
-    </script>
-    {% else %}
-    <div class="row">
-        <div class="col-12 text-center py-5">
-            <div class="text-muted mb-3">
-                <i class="fas fa-history fa-4x opacity-25"></i>
+                <button
+                    type="button"
+                    class="btn btn-outline-success period-button"
+                    data-start="0"
+                    data-end="90"
+                    data-label="Seluruh 90 Hari"
+                >
+                    Seluruh 90 Hari
+                </button>
             </div>
-            <h5 class="text-secondary fw-bold">Belum Ada Peramalan yang Dieksekusi</h5>
-            <p class="small text-muted">Silakan unggah berkas penjualan di atas untuk memicu komputasi.</p>
+        </div>
+    </div>
+
+    <!-- GRAFIK -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card ts-card">
+                <div class="card-header bg-white border-0 px-4 pt-4 pb-2">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="ts-section-title mb-0">
+                            <i class="fas fa-chart-area me-2"></i>
+                            Grafik Prediksi Harian ARIMA
+                        </h5>
+
+                        <span
+                            id="chart-product-badge"
+                            class="badge bg-primary px-3 py-2"
+                        >
+                            {{ selected_product }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card-body px-4 pb-4">
+                    <p class="small text-muted mb-3">
+                        Sumbu Y menyesuaikan rentang nilai agar perubahan kecil
+                        terlihat jelas. Nilai prediksi tidak ditambah noise atau
+                        angka acak.
+                    </p>
+
+                    <p class="small text-muted mb-3">
+                        Grafik otomatis menyesuaikan skala sumbu Y agar
+                        perubahan kecil lebih terlihat. Bila nilai tetap sama,
+                        berarti hasil ARIMA memang sudah konvergen, bukan karena
+                        grafik gagal berubah.
+                    </p>
+
+                    <div class="ts-chart-wrapper">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-light border shadow-sm mb-4">
+        <div class="small text-muted">
+            <strong>Catatan:</strong> ARIMA (1,1,1) dapat menghasilkan
+            prediksi yang semakin stabil pada horizon panjang. Itu merupakan
+            perilaku model, bukan kesalahan grafik. Sistem tidak membuat
+            fluktuasi buatan karena akan mengubah hasil penelitian.
+        </div>
+    </div>
+
+    <!-- DETAIL HARIAN -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card ts-card">
+                <div class="card-header bg-white border-0 px-4 pt-4 pb-2">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="ts-section-title mb-0">
+                            <i class="fas fa-calendar-days me-2"></i>
+                            Detail Prediksi Harian
+                        </h5>
+
+                        <span
+                            id="daily-period-label"
+                            class="badge bg-primary px-3 py-2"
+                        >
+                            Hari 1–30
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card-body px-4 pb-4">
+                    <div class="table-responsive ts-table-scroll">
+                        <table class="table table-bordered table-hover align-middle mb-0">
+                            <thead class="table-light ts-sticky-head">
+                                <tr>
+                                    <th class="text-center">No</th>
+                                    <th>Tanggal Prediksi</th>
+                                    <th>Nama Produk</th>
+                                    <th class="text-center">
+                                        Prediksi ARIMA
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="daily-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+
+    <!-- RINGKASAN SEMUA PRODUK -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card ts-card">
+                <div class="card-header bg-white border-0 px-4 pt-4 pb-2">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="ts-section-title mb-0">
+                            <i class="fas fa-table-list me-2"></i>
+                            Ringkasan Prediksi ARIMA 90 Hari
+                        </h5>
+
+                        <span class="badge bg-primary px-3 py-2">
+                            {{ total_products }} Produk
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card-body px-4 pb-4">
+                    <p class="small text-muted">
+                        Semua produk terdapat dalam tabel ini.
+                        Tekan tombol Lihat Grafik untuk mengganti produk.
+                    </p>
+
+                    <div class="table-responsive ts-table-scroll">
+                        <table class="table table-bordered table-hover align-middle mb-0">
+                            <thead class="table-light ts-sticky-head">
+                                <tr>
+                                    <th class="text-center">No</th>
+                                    <th>Product Name</th>
+                                    <th class="text-center">
+                                        Prediksi 90 Hari
+                                    </th>
+                                    <th class="text-center">Aksi</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for item in summary_data %}
+                                <tr
+                                    class="summary-product-row {% if item.product_name == selected_product %}ts-selected-row{% endif %}"
+                                    data-product="{{ item.product_name }}"
+                                >
+                                    <td class="text-center">
+                                        {{ item.no }}
+                                    </td>
+
+                                    <td class="fw-semibold">
+                                        {{ item.product_name }}
+                                    </td>
+
+                                    <td class="text-center fw-bold text-primary">
+                                        {{ "%.2f"|format(item.prediksi_90_hari|float) }}
+                                    </td>
+
+                                    <td class="text-center">
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-primary product-row-button"
+                                            data-product="{{ item.product_name }}"
+                                        >
+                                            Lihat Grafik
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+
+    {% if not error_message %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="ts-empty-state">
+                <i class="fas fa-chart-line fa-4x text-secondary opacity-25 mb-3"></i>
+
+                <h5 class="fw-bold text-secondary">
+                    Dataset Belum Diproses
+                </h5>
+
+                <p class="text-muted mb-0">
+                    Pilih file timeseries.csv di atas,
+                    kemudian tekan Proses Semua Produk.
+                </p>
+            </div>
         </div>
     </div>
     {% endif %}
+
+    {% endif %}
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const fileInput =
+            document.getElementById("timeseries-file");
+
+        const fileNameElement =
+            document.getElementById("selected-file-name");
+
+        if (fileInput && fileNameElement) {
+            fileInput.addEventListener("change", function () {
+                fileNameElement.textContent =
+                    this.files.length
+                    ? "File dipilih: " + this.files[0].name
+                    : "";
+            });
+        }
+    });
+</script>
+
+{% if forecast_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    const allForecastData = {{ forecast_data | tojson }};
+    const summaryData = {{ summary_data | tojson }};
+
+    let currentProduct = {{ selected_product | tojson }};
+    let currentProductData = [];
+    let currentStart = 0;
+    let currentEnd = 30;
+    let currentLabel = "Hari 1–30";
+    let forecastChart = null;
+
+    function getSummary(productName) {
+        return summaryData.find(function (item) {
+            return item.product_name === productName;
+        });
+    }
+
+    function updateSelectedRow(productName) {
+        document
+            .querySelectorAll(".summary-product-row")
+            .forEach(function (row) {
+                row.classList.toggle(
+                    "ts-selected-row",
+                    row.dataset.product === productName
+                );
+            });
+    }
+
+    function updateProductInformation(productName) {
+        const summary = getSummary(productName);
+
+        const total90 = summary
+            ? Number(summary.prediksi_90_hari)
+            : 0;
+
+        const dailyTotal = currentProductData.reduce(
+            function (total, item) {
+                return total + Number(item.arima);
+            },
+            0
+        );
+
+        document.getElementById(
+            "selected-product-name"
+        ).textContent = productName;
+
+        document.getElementById(
+            "selected-product-total"
+        ).textContent = total90.toFixed(2);
+
+        document.getElementById(
+            "selected-daily-total"
+        ).textContent = dailyTotal.toFixed(2);
+
+        document.getElementById(
+            "chart-product-badge"
+        ).textContent = productName;
+
+        document.getElementById(
+            "product-selector"
+        ).value = productName;
+
+        updateSelectedRow(productName);
+    }
+
+    function selectProduct(productName) {
+        currentProduct = productName;
+
+        currentProductData = allForecastData.filter(
+            function (item) {
+                return item.product_name === productName;
+            }
+        );
+
+        currentStart = 0;
+        currentEnd = 30;
+        currentLabel = "Hari 1–30";
+
+        updateProductInformation(productName);
+        renderPeriod(0, 30, "Hari 1–30");
+    }
+
+    function renderPeriod(start, end, label) {
+        currentStart = start;
+        currentEnd = end;
+        currentLabel = label;
+
+        const displayedData = currentProductData.slice(
+            start,
+            Math.min(end, currentProductData.length)
+        );
+
+        document
+            .querySelectorAll(".period-button")
+            .forEach(function (button) {
+                button.classList.remove("active");
+            });
+
+        const activeButton = Array.from(
+            document.querySelectorAll(".period-button")
+        ).find(function (button) {
+            return (
+                Number(button.dataset.start) === start
+                && Number(button.dataset.end) === end
+            );
+        });
+
+        if (activeButton) {
+            activeButton.classList.add("active");
+        }
+
+        document.getElementById(
+            "daily-period-label"
+        ).textContent = label;
+
+        const predictionValues = displayedData.map(
+            function (item) {
+                return Number(item.arima);
+            }
+        );
+
+        if (forecastChart) {
+            forecastChart.data.labels = displayedData.map(
+                function (item) {
+                    return item.date;
+                }
+            );
+
+            forecastChart.data.datasets[0].data =
+                predictionValues;
+
+            forecastChart.data.datasets[0].label =
+                "Prediksi ARIMA - " + currentProduct;
+
+            if (predictionValues.length > 0) {
+                const minValue = Math.min(
+                    ...predictionValues
+                );
+
+                const maxValue = Math.max(
+                    ...predictionValues
+                );
+
+                const range = maxValue - minValue;
+
+                const average =
+                    predictionValues.reduce(
+                        function (total, value) {
+                            return total + value;
+                        },
+                        0
+                    ) / predictionValues.length;
+
+                const padding = Math.max(
+                    range * 0.25,
+                    Math.abs(average) * 0.01,
+                    0.5
+                );
+
+                forecastChart.options.scales.y.min =
+                    Math.max(0, minValue - padding);
+
+                forecastChart.options.scales.y.max =
+                    maxValue + padding;
+            }
+
+            forecastChart.update();
+        }
+
+        const tableBody = document.getElementById(
+            "daily-table-body"
+        );
+
+        tableBody.innerHTML = "";
+
+        displayedData.forEach(
+            function (item, index) {
+                const row = document.createElement("tr");
+
+                row.innerHTML = `
+                    <td class="text-center">
+                        ${start + index + 1}
+                    </td>
+                    <td>${item.date}</td>
+                    <td>${item.product_name}</td>
+                    <td class="text-center fw-bold text-success">
+                        ${Number(item.arima).toFixed(2)}
+                    </td>
+                `;
+
+                tableBody.appendChild(row);
+            }
+        );
+    }
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        function () {
+            const canvas = document.getElementById(
+                "forecastChart"
+            );
+
+            forecastChart = new Chart(
+                canvas.getContext("2d"),
+                {
+                    type: "line",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "Prediksi ARIMA",
+                                data: [],
+                                borderColor: "#2563eb",
+                                backgroundColor:
+                                    "rgba(37, 99, 235, 0.12)",
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.25,
+                                pointRadius: 3,
+                                pointHoverRadius: 6
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: "index",
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: {
+                                position: "top"
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: "Tanggal Prediksi"
+                                }
+                            },
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: "Jumlah Prediksi Penjualan"
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+
+            document
+                .querySelectorAll(".period-button")
+                .forEach(function (button) {
+                    button.addEventListener(
+                        "click",
+                        function () {
+                            renderPeriod(
+                                Number(this.dataset.start),
+                                Number(this.dataset.end),
+                                this.dataset.label
+                            );
+                        }
+                    );
+                });
+
+            const selector = document.getElementById(
+                "product-selector"
+            );
+
+            selector.addEventListener(
+                "change",
+                function () {
+                    selectProduct(this.value);
+                }
+            );
+
+            document.getElementById(
+                "show-product-button"
+            ).addEventListener(
+                "click",
+                function () {
+                    selectProduct(selector.value);
+
+                    document.getElementById(
+                        "hasil-grafik"
+                    ).scrollIntoView({
+                        behavior: "smooth"
+                    });
+                }
+            );
+
+            document
+                .querySelectorAll(".product-row-button")
+                .forEach(function (button) {
+                    button.addEventListener(
+                        "click",
+                        function () {
+                            selectProduct(
+                                this.dataset.product
+                            );
+
+                            document.getElementById(
+                                "hasil-grafik"
+                            ).scrollIntoView({
+                                behavior: "smooth"
+                            });
+                        }
+                    );
+                });
+
+            selectProduct(currentProduct);
+        }
+    );
+</script>
+{% endif %}
+
 {% endblock %}

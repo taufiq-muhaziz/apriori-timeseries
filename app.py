@@ -1,297 +1,1436 @@
+from pathlib import Path
 import os
-import io
-import base64
-import pandas as pd
+import re
+
 import numpy as np
-from flask import Flask, render_template, request
+import pandas as pd
+from flask import Flask, render_template, request, redirect, url_for
 from mlxtend.frequent_patterns import apriori, association_rules
 from statsmodels.tsa.arima.model import ARIMA
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-from prophet import Prophet
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+
 
 app = Flask(__name__)
-app.secret_key = 'skripsi_rahasia_kamu'
+print("=" * 60)
+print("APP YANG DIJALANKAN:")
+print(Path(__file__).resolve())
 
-ALLOWED_EXTENSIONS = {'csv', 'xlsx', 'xls'}
+print("FOLDER TEMPLATE YANG DIBACA:")
+print((Path(__file__).resolve().parent / "templates").resolve())
+
+print("FILE TIMESERIES YANG DIBACA:")
+print(
+    (
+        Path(__file__).resolve().parent
+        / "templates"
+        / "timeseries.html"
+    ).resolve()
+)
+print("=" * 60)
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "skripsi_apriori_timeseries"
+)
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
+
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "output"
+DATA_DIR = BASE_DIR / "data"
+
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+FILE_HASIL_APRIORI = OUTPUT_DIR / "hasil_apriori.csv"
+FILE_PREDIKSI_HARIAN = OUTPUT_DIR / "prediksi_arima_harian.csv"
+FILE_PREDIKSI_RINGKASAN = OUTPUT_DIR / "prediksi_arima_90_hari.csv"
+FILE_REKOMENDASI = OUTPUT_DIR / "rekomendasi_stok.csv"
+
+ALLOWED_EXTENSIONS = {"csv"}
+
+MIN_SUPPORT_DEFAULT = 0.01
+MIN_CONFIDENCE_DEFAULT = 0.10
+MIN_LIFT = 1.0
+
+TOP_PRODUCTS = 50
+FORECAST_HORIZON = 90
+ARIMA_ORDER = (2, 1, 2)
+
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower()
+        in ALLOWED_EXTENSIONS
+    )
 
-@app.route('/')
-def dashboard():
-    return render_template('index.html')
 
-@app.route('/apriori', methods=['GET', 'POST'])
-def apriori_route():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return "Kunci file tidak ditemukan", 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return "Tidak ada file yang dipilih", 400
-            
-        if file and allowed_file(file.filename):
-            min_support_input = float(request.form.get('min_support', 0.05))
-            min_confidence_input = float(request.form.get('min_confidence', 0.5))
-            
+def read_csv_flexible(source):
+    """
+    Membaca CSV dengan pemisah koma, titik koma, atau tab secara otomatis.
+    """
+    return pd.read_csv(
+        source,
+        sep=None,
+        engine="python",
+        encoding="utf-8-sig",
+        on_bad_lines="skip"
+    )
+
+
+def normalize_columns(data):
+    data = data.copy()
+
+    data.columns = [
+        re.sub(r"\s+", " ", str(column).strip())
+        for column in data.columns
+    ]
+
+    return data
+
+
+def normalize_key(value):
+    return re.sub(
+        r"[^a-z0-9]+",
+        "_",
+        str(value).strip().lower()
+    ).strip("_")
+
+
+def find_column(data, candidates):
+    normalized_columns = {
+        normalize_key(column): column
+        for column in data.columns
+    }
+
+    for candidate in candidates:
+        key = normalize_key(candidate)
+
+        if key in normalized_columns:
+            return normalized_columns[key]
+
+    return None
+
+
+def numeric_series(series):
+    """
+    Mengubah kolom angka menjadi numerik.
+    Cocok untuk Qty, support, confidence, dan hasil prediksi.
+    """
+    values = (
+        series.astype(str)
+        .str.replace("%", "", regex=False)
+        .str.strip()
+    )
+
+        contains_comma = values.str.contains(",", regex=False, na=False)
+    contains_dot = values.str.contains(".", regex=False, na=False)
+
+    indonesia_mask = contains_comma & contains_dot
+
+    values.loc[indonesia_mask] = (
+        values.loc[indonesia_mask]
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
+
+    values.loc[contains_comma & ~contains_dot] = (
+        values.loc[contains_comma & ~contains_dot]
+        .str.replace(",", ".", regex=False)
+    )
+
+    return pd.to_numeric(values, errors="coerce")
+
+
+def find_existing_file(filename):
+    """
+    Mencari file pada folder output, folder utama, dan folder data.
+    """
+    locations = [
+        OUTPUT_DIR / filename,
+        BASE_DIR / filename,
+        DATA_DIR / filename
+    ]
+
+    for path in locations:
+        if path.exists() and path.is_file():
+            return path
+
+    return None
+
+
+def get_evaluation_data():
+    """
+    Nilai evaluasi berdasarkan hasil pengolahan offline penelitian.
+    """
+    return [
+        {
+            "rank": 1,
+            "model": "ARIMA",
+            "total_products": 50,
+            "mae": 42.46,
+            "rmse": 76.86,
+            "mape": 102.14,
+            "status": "Model Terbaik"
+        },
+        {
+            "rank": 2,
+            "model": "SARIMA",
+            "total_products": 50,
+            "mae": 53.98,
+            "rmse": 84.78,
+            "mape": 173.76,
+            "status": "Model Pembanding"
+        },
+        {
+            "rank": 3,
+            "model": "Prophet",
+            "total_products": 50,
+            "mae": 110.42,
+            "rmse": 129.56,
+            "mape": 497.01,
+            "status": "Model Pembanding"
+        }
+    ]
+
+
+def validate_timeseries_dataset(data):
+    data = normalize_columns(data)
+
+    date_col = find_column(
+        data,
+        ["Date", "Tanggal", "Transaction_Date"]
+    )
+    product_col = find_column(
+        data,
+        [
+            "Product_Name",
+            "Product Name",
+            "Produk",
+            "Nama Produk"
+        ]
+    )
+    qty_col = find_column(
+        data,
+        [
+            "Qty",
+            "Quantity",
+            "Jumlah",
+            "Jumlah Terjual"
+        ]
+    )
+
+    missing_columns = []
+
+    if not date_col:
+        missing_columns.append("Date")
+
+    if not product_col:
+        missing_columns.append("Product_Name")
+
+    if not qty_col:
+        missing_columns.append("Qty")
+
+    if missing_columns:
+        raise ValueError(
+            "Dataset harus memiliki kolom: "
+            + ", ".join(missing_columns)
+            + "."
+        )
+
+    clean_data = data[
+        [date_col, product_col, qty_col]
+    ].copy()
+
+    clean_data.columns = [
+        "Date",
+        "Product_Name",
+        "Qty"
+    ]
+
+    clean_data["Date"] = pd.to_datetime(
+        clean_data["Date"],
+        errors="coerce",
+        dayfirst=True
+    )
+
+    clean_data["Product_Name"] = (
+        clean_data["Product_Name"]
+        .astype(str)
+        .str.strip()
+    )
+
+    clean_data["Qty"] = numeric_series(
+        clean_data["Qty"]
+    )
+
+    clean_data = clean_data.dropna(
+        subset=[
+            "Date",
+            "Product_Name",
+            "Qty"
+        ]
+    )
+
+    clean_data = clean_data[
+        clean_data["Product_Name"] != ""
+    ].copy()
+
+    clean_data = clean_data[
+        clean_data["Qty"] >= 0
+    ].copy()
+
+    if clean_data.empty:
+        raise ValueError(
+            "Dataset tidak memiliki data valid yang dapat diproses."
+        )
+
+    return clean_data
+
+
+def forecast_one_product(product_series):
+    """
+    Menjalankan ARIMA (2,1,2) untuk satu produk.
+    Jika model gagal, sistem menggunakan rata-rata historis agar produk
+    tetap memiliki hasil prediksi.
+    """
+    if product_series.empty:
+        return np.zeros(FORECAST_HORIZON)
+
+    if len(product_series) < 10:
+        mean_value = max(
+            float(product_series.mean()),
+            0
+        )
+
+        return np.repeat(
+            mean_value,
+            FORECAST_HORIZON
+        )
+
+    try:
+        model = ARIMA(
+            product_series,
+            order=ARIMA_ORDER,
+            enforce_stationarity=False,
+            enforce_invertibility=False
+        )
+
+        fitted_model = model.fit()
+
+        prediction = fitted_model.forecast(
+            steps=FORECAST_HORIZON
+        )
+
+        prediction = np.asarray(
+            prediction,
+            dtype=float
+        )
+
+    except Exception:
+        mean_value = max(
+            float(product_series.mean()),
+            0
+        )
+
+        prediction = np.repeat(
+            mean_value,
+            FORECAST_HORIZON
+        )
+
+    prediction = np.nan_to_num(
+        prediction,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0
+    )
+
+    prediction = np.clip(
+        prediction,
+        0,
+        None
+    )
+
+    return prediction
+
+
+def process_timeseries(data):
+    """
+    Memproses seluruh produk atau maksimal 50 produk terlaris.
+    Hasil berisi prediksi harian 90 hari untuk setiap produk dan
+    ringkasan total 90 hari.
+    """
+    clean_data = validate_timeseries_dataset(data)
+
+    product_totals = (
+        clean_data.groupby("Product_Name")["Qty"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    product_list = (
+        product_totals
+        .head(TOP_PRODUCTS)
+        .index
+        .tolist()
+    )
+
+    if not product_list:
+        raise ValueError(
+            "Tidak ada produk yang dapat diprediksi."
+        )
+
+    filtered_data = clean_data[
+        clean_data["Product_Name"].isin(product_list)
+    ].copy()
+
+    daily_rows = []
+    summary_rows = []
+    failed_products = []
+
+    for product_number, product_name in enumerate(
+        product_list,
+        start=1
+    ):
+        try:
+            product_history = filtered_data[
+                filtered_data["Product_Name"]
+                == product_name
+            ].copy()
+
+            product_daily = (
+                product_history
+                .groupby("Date")["Qty"]
+                .sum()
+                .sort_index()
+            )
+
+            product_dates = pd.date_range(
+                start=product_daily.index.min(),
+                end=product_daily.index.max(),
+                freq="D"
+            )
+
+            product_series = (
+                product_daily
+                .reindex(
+                    product_dates,
+                    fill_value=0
+                )
+                .astype(float)
+            )
+
+            prediction = forecast_one_product(
+                product_series
+            )
+
+            future_dates = pd.date_range(
+                start=product_series.index.max()
+                + pd.Timedelta(days=1),
+                periods=FORECAST_HORIZON,
+                freq="D"
+            )
+
+                      rounded_prediction = np.round(
+                prediction,
+                2
+            )
+
+            for forecast_date, forecast_value in zip(
+                future_dates,
+                rounded_prediction
+            ):
+                daily_rows.append({
+                    "Tanggal": forecast_date,
+                    "Product_Name": product_name,
+                    "Prediksi_ARIMA": float(
+                        forecast_value
+                    )
+                })
+
+            summary_rows.append({
+                "No": product_number,
+                "Product_Name": product_name,
+                "Prediksi_90_Hari": round(
+                    float(
+                        rounded_prediction.sum()
+                    ),
+                    2
+                )
+            })
+
+        except Exception as error:
+            failed_products.append({
+                "product_name": product_name,
+                "error": str(error)
+            })
+
+    if not summary_rows:
+        raise ValueError(
+            "Tidak ada produk yang berhasil diprediksi."
+        )
+
+    daily_result = pd.DataFrame(daily_rows)
+    summary_result = pd.DataFrame(summary_rows)
+
+    daily_result = daily_result.sort_values(
+        ["Product_Name", "Tanggal"]
+    ).reset_index(drop=True)
+
+    summary_result = summary_result.reset_index(
+        drop=True
+    )
+
+    summary_result["No"] = range(
+        1,
+        len(summary_result) + 1
+    )
+
+    return {
+        "harian": daily_result,
+        "ringkasan": summary_result,
+        "produk_gagal": failed_products
+    }
+
+def build_timeseries_context(
+    daily_data,
+    summary_data,
+    selected_product=None,
+    failed_products=None,
+    success_message=None
+):
+    """
+    Menyiapkan seluruh prediksi semua produk untuk halaman Time Series.
+    Pergantian produk dilakukan langsung di browser tanpa upload ulang.
+    """
+    daily_data = normalize_columns(daily_data)
+    summary_data = normalize_columns(summary_data)
+
+    daily_date_col = find_column(
+        daily_data,
+        ["Tanggal", "Date"]
+    )
+    daily_product_col = find_column(
+        daily_data,
+        ["Product_Name", "Product Name"]
+    )
+    daily_prediction_col = find_column(
+        daily_data,
+        ["Prediksi_ARIMA", "Prediksi ARIMA"]
+    )
+
+    summary_no_col = find_column(
+        summary_data,
+        ["No"]
+    )
+    summary_product_col = find_column(
+        summary_data,
+        ["Product_Name", "Product Name"]
+    )
+    summary_prediction_col = find_column(
+        summary_data,
+        ["Prediksi_90_Hari", "Prediksi 90 Hari"]
+    )
+
+    if (
+        not daily_date_col
+        or not daily_product_col
+        or not daily_prediction_col
+    ):
+        raise ValueError(
+            "File prediksi harian tidak memiliki struktur yang benar."
+        )
+
+    if (
+        not summary_product_col
+        or not summary_prediction_col
+    ):
+        raise ValueError(
+            "File ringkasan prediksi tidak memiliki struktur yang benar."
+        )
+
+    daily_data[daily_date_col] = pd.to_datetime(
+        daily_data[daily_date_col],
+        errors="coerce",
+        dayfirst=True
+    )
+
+    daily_data[daily_product_col] = (
+        daily_data[daily_product_col]
+        .astype(str)
+        .str.strip()
+    )
+
+    daily_data[daily_prediction_col] = numeric_series(
+        daily_data[daily_prediction_col]
+    )
+
+    daily_data = daily_data.dropna(
+        subset=[
+            daily_date_col,
+            daily_product_col,
+            daily_prediction_col
+        ]
+    )
+
+    summary_data[summary_product_col] = (
+        summary_data[summary_product_col]
+        .astype(str)
+        .str.strip()
+    )
+
+    summary_data[summary_prediction_col] = numeric_series(
+        summary_data[summary_prediction_col]
+    )
+
+    summary_data = summary_data.dropna(
+        subset=[
+            summary_product_col,
+            summary_prediction_col
+        ]
+    ).reset_index(drop=True)
+
+    if summary_data.empty:
+        raise ValueError(
+            "Ringkasan prediksi tidak memiliki data valid."
+        )
+
+    product_list = (
+        summary_data[summary_product_col]
+        .drop_duplicates()
+        .tolist()
+    )
+
+    requested_product = (
+        str(selected_product).strip()
+        if selected_product is not None
+        else ""
+    )
+
+    if requested_product not in product_list:
+        requested_product = product_list[0]
+
+    selected_product = requested_product
+
+    all_forecast_records = []
+
+    sorted_daily_data = daily_data.sort_values(
+        [daily_product_col, daily_date_col]
+    )
+
+    for _, row in sorted_daily_data.iterrows():
+        all_forecast_records.append({
+            "date": row[daily_date_col].strftime("%d-%m-%Y"),
+            "product_name": str(row[daily_product_col]),
+            "arima": round(
+                float(row[daily_prediction_col]),
+                2
+            )
+        })
+
+    summary_records = []
+
+    for index, row in summary_data.iterrows():
+        if (
+            summary_no_col
+            and pd.notna(row[summary_no_col])
+        ):
             try:
-                nama_file = file.filename.lower()
-                if nama_file.endswith('.csv'):
-                    df = pd.read_csv(file, sep=None, engine='python', on_bad_lines='skip')
-                elif nama_file.endswith('.xlsx') or nama_file.endswith('.xls'):
-                    df = pd.read_excel(file)
-                else:
-                    return "Format file tidak didukung!", 400
-                    
-                df.columns = df.columns.str.strip()
-                
-                kolom_id = 'Transaction_ID'
-                kolom_produk = 'Product_Name'
-                
-                if kolom_id not in df.columns or kolom_produk not in df.columns:
-                    return f"Struktur salah! Sistem membutuhkan kolom '{kolom_id}' dan '{kolom_produk}'. Kolom di file kamu: {list(df.columns)}", 400
-                
-                basket = (df.groupby([kolom_id, kolom_produk])[kolom_produk]
-                          .count().unstack().reset_index().fillna(0)
-                          .set_index(kolom_id))
-                
-                basket_sets = basket.applymap(lambda x: True if x > 0 else False)
-                frequent_itemsets = apriori(basket_sets, min_support=min_support_input, use_colnames=True)
-                
-                if frequent_itemsets.empty:
-                    min_support_input = 0.01
-                    frequent_itemsets = apriori(basket_sets, min_support=min_support_input, use_colnames=True)
-                
-                if frequent_itemsets.empty:
-                    return render_template('apriori.html', rules_data=[], total_transactions=len(basket_sets), total_products=len(basket.columns), total_rules=0)
-                
-                rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=min_confidence_input)
-                
-                if rules.empty:
-                    rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=0.1)
-                
-                rules_formatted = []
-                for idx, row in rules.iterrows():
-                    rules_formatted.append({
-                        "antecedent": ", ".join(list(row['antecedents'])),
-                        "consequent": ", ".join(list(row['consequents'])),
-                        "support": round(row['support'], 3),
-                        "confidence": round(row['confidence'], 3),
-                        "lift": round(row['lift'], 3)
-                    })
-                
-                return render_template('apriori.html', 
-                                       rules_data=rules_formatted,
-                                       total_transactions=len(basket_sets),
-                                       total_products=len(basket.columns),
-                                       total_rules=len(rules_formatted))
-                                       
-            except Exception as e:
-                return f"Gagal memproses file. Error: {str(e)}", 500
+                row_number = int(
+                    float(row[summary_no_col])
+                )
+            except (TypeError, ValueError):
+                row_number = index + 1
         else:
-            return "Format file tidak diizinkan! Harus berupa berkas .csv atau .xlsx/.xls", 400
-            
-    return render_template('apriori.html', rules_data=None)
+            row_number = index + 1
 
-@app.route('/timeseries', methods=['GET', 'POST'])
+        summary_records.append({
+            "no": row_number,
+            "product_name": str(
+                row[summary_product_col]
+            ),
+            "prediksi_90_hari": round(
+                float(row[summary_prediction_col]),
+                2
+            )
+        })
+
+    selected_summary = next(
+        (
+            item
+            for item in summary_records
+            if item["product_name"] == selected_product
+        ),
+        None
+    )
+
+    selected_daily = [
+        item
+        for item in all_forecast_records
+        if item["product_name"] == selected_product
+    ]
+
+    selected_total = (
+        selected_summary["prediksi_90_hari"]
+        if selected_summary
+        else 0
+    )
+
+    selected_daily_total = round(
+        sum(item["arima"] for item in selected_daily),
+        2
+    )
+
+    return {
+        "forecast_data": all_forecast_records,
+        "summary_data": summary_records,
+        "product_list": product_list,
+        "selected_product": selected_product,
+        "total_products": len(product_list),
+        "prediksi_total_terpilih": selected_total,
+        "jumlah_harian": selected_daily_total,
+        "selisih_total": round(
+            selected_total - selected_daily_total,
+            2
+        ),
+        "produk_gagal": failed_products or [],
+        "evaluation_data": get_evaluation_data(),
+        "error_message": None,
+        "success_message": success_message
+    }
+
+
+def empty_timeseries_context(error_message=None):
+    return {
+        "forecast_data": [],
+        "summary_data": [],
+        "product_list": [],
+        "selected_product": "",
+        "total_products": 0,
+        "prediksi_total_terpilih": 0,
+        "jumlah_harian": 0,
+        "selisih_total": 0,
+        "produk_gagal": [],
+        "evaluation_data": get_evaluation_data(),
+        "error_message": error_message,
+        "success_message": None
+    }
+
+
+def load_saved_timeseries_context(
+    selected_product=None,
+    success_message=None
+):
+    daily_file = find_existing_file(
+        "prediksi_arima_harian.csv"
+    )
+    summary_file = find_existing_file(
+        "prediksi_arima_90_hari.csv"
+    )
+
+    if not daily_file or not summary_file:
+        return None
+
+    daily_data = read_csv_flexible(
+        daily_file
+    )
+    summary_data = read_csv_flexible(
+        summary_file
+    )
+
+    return build_timeseries_context(
+        daily_data,
+        summary_data,
+        selected_product=selected_product,
+        success_message=success_message
+    )
+
+
+def process_apriori(
+    data,
+    min_support,
+    min_confidence
+):
+    data = normalize_columns(data)
+
+    transaction_col = find_column(
+        data,
+        [
+            "Transaction_ID",
+            "Transaction ID",
+            "Kode Transaksi"
+        ]
+    )
+    product_col = find_column(
+        data,
+        [
+            "Product_Name",
+            "Product Name",
+            "Nama Produk"
+        ]
+    )
+
+    if not transaction_col or not product_col:
+        raise ValueError(
+            "Dataset Apriori harus memiliki kolom "
+            "Transaction_ID dan Product_Name."
+        )
+
+    data = data.dropna(
+        subset=[
+            transaction_col,
+            product_col
+        ]
+    )
+
+    data[product_col] = (
+        data[product_col]
+        .astype(str)
+        .str.strip()
+    )
+
+    basket = (
+        data.groupby(
+            [transaction_col, product_col]
+        )
+        .size()
+        .unstack(fill_value=0)
+    )
+
+    basket_sets = basket.gt(0)
+
+    frequent_itemsets = apriori(
+        basket_sets,
+        min_support=min_support,
+        use_colnames=True
+    )
+
+    if frequent_itemsets.empty:
+        return {
+            "rules_data": [],
+            "total_transactions": len(
+                basket_sets
+            ),
+            "total_products": len(
+                basket_sets.columns
+            ),
+            "total_rules": 0
+        }
+
+    rules = association_rules(
+        frequent_itemsets,
+        metric="confidence",
+        min_threshold=min_confidence
+    )
+
+    if not rules.empty:
+        rules = rules[
+            (rules["support"] >= min_support)
+            & (
+                rules["confidence"]
+                >= min_confidence
+            )
+            & (rules["lift"] > MIN_LIFT)
+            & (
+                rules["antecedents"]
+                .apply(len)
+                == 1
+            )
+            & (
+                rules["consequents"]
+                .apply(len)
+                == 1
+            )
+        ].copy()
+
+    if not rules.empty:
+        rules = rules.sort_values(
+            by=[
+                "confidence",
+                "lift",
+                "support"
+            ],
+            ascending=[
+                False,
+                False,
+                False
+            ]
+        ).reset_index(drop=True)
+
+    rules_formatted = []
+    output_rows = []
+
+    for _, row in rules.iterrows():
+        antecedent = next(
+            iter(row["antecedents"])
+        )
+        consequent = next(
+            iter(row["consequents"])
+        )
+
+        rules_formatted.append({
+            "antecedent": antecedent,
+            "consequent": consequent,
+            "support": round(
+                float(row["support"]),
+                4
+            ),
+            "confidence": round(
+                float(row["confidence"]),
+                4
+            ),
+            "lift": round(
+                float(row["lift"]),
+                2
+            )
+        })
+
+        output_rows.append({
+            "Antecedent": antecedent,
+            "Consequent": consequent,
+            "Support (%)": round(
+                float(row["support"]) * 100,
+                2
+            ),
+            "Confidence (%)": round(
+                float(row["confidence"]) * 100,
+                2
+            ),
+            "Lift": round(
+                float(row["lift"]),
+                2
+            )
+        })
+
+    pd.DataFrame(
+        output_rows,
+        columns=[
+            "Antecedent",
+            "Consequent",
+            "Support (%)",
+            "Confidence (%)",
+            "Lift"
+        ]
+    ).to_csv(
+        FILE_HASIL_APRIORI,
+        sep=";",
+        index=False,
+        encoding="utf-8-sig"
+    )
+
+    return {
+        "rules_data": rules_formatted,
+        "total_transactions": len(
+            basket_sets
+        ),
+        "total_products": len(
+            basket_sets.columns
+        ),
+        "total_rules": len(
+            rules_formatted
+        )
+    }
+
+
+def prepare_recommendation_data(data):
+    data = normalize_columns(data)
+
+    no_col = find_column(data, ["No"])
+    product_col = find_column(
+        data,
+        [
+            "Product Name",
+            "Product_Name",
+            "Produk"
+        ]
+    )
+    prediction_col = find_column(
+        data,
+        [
+            "Prediksi 90 Hari",
+            "Prediksi_90_Hari"
+        ]
+    )
+    category_col = find_column(
+        data,
+        [
+            "Kategori Prediksi",
+            "Kategori_Prediksi"
+        ]
+    )
+    pair_col = find_column(
+        data,
+        [
+            "Produk_Pasangan",
+            "Produk Pasangan"
+        ]
+    )
+    support_col = find_column(
+        data,
+        ["Support (%)", "Support"]
+    )
+    confidence_col = find_column(
+        data,
+        [
+            "Confidence (%)",
+            "Confidence"
+        ]
+    )
+    lift_col = find_column(
+        data,
+        ["Lift"]
+    )
+    relation_col = find_column(
+        data,
+        [
+            "Hubungan Apriori",
+            "Hubungan_Apriori"
+        ]
+    )
+    recommendation_col = find_column(
+        data,
+        ["Rekomendasi"]
+    )
+
+    required_columns = {
+        "Product Name": product_col,
+        "Prediksi 90 Hari": prediction_col,
+        "Kategori Prediksi": category_col,
+        "Produk Pasangan": pair_col,
+        "Hubungan Apriori": relation_col,
+        "Rekomendasi": recommendation_col
+    }
+
+    missing_columns = [
+        name
+        for name, column
+        in required_columns.items()
+        if not column
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            "Kolom rekomendasi tidak lengkap: "
+            + ", ".join(missing_columns)
+        )
+
+    recommendation_data = []
+
+    for index, row in data.iterrows():
+        def clean_optional(column):
+            if (
+                not column
+                or pd.isna(row[column])
+            ):
+                return None
+
+            value = str(row[column]).strip()
+
+            if (
+                value == ""
+                or value.lower() == "nan"
+            ):
+                return None
+
+            return value
+
+        if (
+            no_col
+            and pd.notna(row[no_col])
+        ):
+            try:
+                row_number = int(
+                    float(row[no_col])
+                )
+            except (TypeError, ValueError):
+                row_number = index + 1
+        else:
+            row_number = index + 1
+
+        recommendation_data.append({
+            "no": row_number,
+            "product_name": str(
+                row[product_col]
+            ).strip(),
+            "prediksi_90_hari": clean_optional(
+                prediction_col
+            ),
+            "kategori_prediksi": str(
+                row[category_col]
+            ).strip(),
+            "produk_pasangan": (
+                clean_optional(pair_col)
+                or "-"
+            ),
+            "support": clean_optional(
+                support_col
+            ),
+            "confidence": clean_optional(
+                confidence_col
+            ),
+            "lift": clean_optional(
+                lift_col
+            ),
+            "hubungan_apriori": str(
+                row[relation_col]
+            ).strip(),
+            "rekomendasi": str(
+                row[recommendation_col]
+            ).strip()
+        })
+
+    return {
+        "recommendation_data": recommendation_data,
+        "total_items": len(
+            recommendation_data
+        ),
+        "count_high": sum(
+            item["kategori_prediksi"]
+            == "Tinggi"
+            for item in recommendation_data
+        ),
+        "count_medium": sum(
+            item["kategori_prediksi"]
+            == "Sedang"
+            for item in recommendation_data
+        ),
+        "count_low": sum(
+            item["kategori_prediksi"]
+            == "Rendah"
+            for item in recommendation_data
+        ),
+        "count_strong": sum(
+            item["hubungan_apriori"]
+            == "Kuat"
+            for item in recommendation_data
+        ),
+        "count_not_strong": sum(
+            item["hubungan_apriori"]
+            == "Tidak kuat"
+            for item in recommendation_data
+        )
+    }
+
+
+@app.route("/")
+def dashboard():
+    return render_template(
+        "index.html"
+    )
+
+
+@app.route(
+    "/apriori",
+    methods=["GET", "POST"]
+)
+def apriori_route():
+    if request.method == "GET":
+        return render_template(
+            "apriori.html",
+            rules_data=None,
+            min_support=MIN_SUPPORT_DEFAULT,
+            min_confidence=MIN_CONFIDENCE_DEFAULT
+        )
+
+    try:
+        uploaded_file = request.files.get(
+            "file"
+        )
+
+        if (
+            not uploaded_file
+            or uploaded_file.filename == ""
+        ):
+            raise ValueError(
+                "Pilih file dataset Apriori terlebih dahulu."
+            )
+
+        if not allowed_file(
+            uploaded_file.filename
+        ):
+            raise ValueError(
+                "Dataset Apriori harus berformat CSV."
+            )
+
+        min_support = float(
+            request.form.get(
+                "min_support",
+                MIN_SUPPORT_DEFAULT
+            )
+        )
+
+        min_confidence = float(
+            request.form.get(
+                "min_confidence",
+                MIN_CONFIDENCE_DEFAULT
+            )
+        )
+
+        if not 0 < min_support <= 1:
+            raise ValueError(
+                "Minimum support harus berada pada rentang 0 sampai 1."
+            )
+
+        if not 0 < min_confidence <= 1:
+            raise ValueError(
+                "Minimum confidence harus berada pada rentang 0 sampai 1."
+            )
+
+        data = read_csv_flexible(
+            uploaded_file
+        )
+
+        context = process_apriori(
+            data,
+            min_support,
+            min_confidence
+        )
+
+        return render_template(
+            "apriori.html",
+            **context,
+            min_support=min_support,
+            min_confidence=min_confidence,
+            error_message=None
+        )
+
+    except Exception as error:
+        return render_template(
+            "apriori.html",
+            rules_data=None,
+            min_support=MIN_SUPPORT_DEFAULT,
+            min_confidence=MIN_CONFIDENCE_DEFAULT,
+            error_message=str(error)
+        )
+
+
+@app.route(
+    "/timeseries",
+    methods=["GET", "POST"]
+)
 def timeseries():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return "Kunci file tidak ditemukan", 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return "Tidak ada file yang dipilih", 400
-            
-        if file and allowed_file(file.filename):
-            seasonality = int(request.form.get('seasonality', 7))
-            
-            try:
-                nama_file = file.filename.lower()
-                if nama_file.endswith('.csv'):
-                    df = pd.read_csv(file, sep=None, engine='python', on_bad_lines='skip')
-                else:
-                    df = pd.read_excel(file)
-                    
-                df.columns = df.columns.str.strip()
-                
-                kolom_tanggal = 'Date'
-                kolom_qty = 'Qty' if 'Qty' in df.columns else ('Quantity' if 'Quantity' in df.columns else None)
-                kolom_produk = 'Product_Name' if 'Product_Name' in df.columns else None
-                
-                if not kolom_qty or kolom_tanggal not in df.columns:
-                    return "Struktur kolom salah! Pastikan ada kolom 'Date' dan 'Qty'.", 400
-                
-                df[kolom_tanggal] = pd.to_datetime(df[kolom_tanggal], errors='coerce')
-                df = df.dropna(subset=[kolom_tanggal])
-                df[kolom_qty] = pd.to_numeric(df[kolom_qty], errors='coerce').fillna(0)
-                
-                df_grouped = df.groupby(kolom_tanggal)[kolom_qty].sum().sort_index()
-                df_grouped = df_grouped.asfreq('D', fill_value=0)
-                
-                if len(df_grouped) < 10:
-                    return "Data histori di file Excel terlalu sedikit untuk melatih model.", 400
-                
-                total_riil_historis = int(df_grouped.sum())
-                last_data_date = df_grouped.index[-1]
-                
-                horizon = 90
-                
-                # Model Prediksi (ARIMA, SARIMA, Prophet)
-                try:
-                    model_arima = ARIMA(df_grouped, order=(1, 1, 1), enforce_stationarity=False, enforce_invertibility=False).fit()
-                    pred_arima = model_arima.forecast(steps=horizon)
-                except:
-                    pred_arima = pd.Series([df_grouped.mean()] * horizon)
-                
-                try:
-                    model_sarima = SARIMAX(df_grouped, order=(1, 1, 1), seasonal_order=(1, 1, 1, seasonality), enforce_stationarity=False, enforce_invertibility=False).fit(disp=False)
-                    pred_sarima = model_sarima.forecast(steps=horizon)
-                except:
-                    pred_sarima = pd.Series([df_grouped.mean()] * horizon)
-                
-                try:
-                    df_prophet = df_grouped.reset_index().rename(columns={kolom_tanggal: 'ds', kolom_qty: 'y'})
-                    model_prophet = Prophet(yearly_seasonality=True, weekly_seasonality=True, daily_seasonality=False)
-                    model_prophet.fit(df_prophet)
-                    future = model_prophet.make_future_dataframe(periods=horizon, freq='D')
-                    forecast_prophet = model_prophet.predict(future)
-                    pred_prophet_vals = forecast_prophet.tail(horizon)['yhat'].values
-                    pred_prophet = pd.Series(pred_prophet_vals)
-                except:
-                    pred_prophet = pd.Series([df_grouped.mean()] * horizon)
-                
-                future_dates = pd.date_range(start=last_data_date + pd.Timedelta(days=1), periods=horizon)
-                
-                forecast_data = []
-                total_sarima_90 = 0
-                for i in range(horizon):
-                    base_arima = pred_arima.iloc[i] if isinstance(pred_arima, pd.Series) else pred_arima[i]
-                    base_sarima = pred_sarima.iloc[i] if isinstance(pred_sarima, pd.Series) else pred_sarima[i]
-                    base_prophet = pred_prophet.iloc[i] if isinstance(pred_prophet, pd.Series) else pred_prophet[i]
-                    
-                    val_arima = max(0, int(round(base_arima * np.random.uniform(0.95, 1.05))))
-                    val_sarima = max(0, int(round(base_sarima * np.random.uniform(0.95, 1.05))))
-                    val_prophet = max(0, int(round(base_prophet * np.random.uniform(0.95, 1.05))))
-                    
-                    total_sarima_90 += val_sarima
-                    
-                    forecast_data.append({
-                        "date": future_dates[i].strftime('%Y-%m-%d'),
-                        "arima": val_arima,
-                        "sarima": val_sarima,
-                        "prophet": val_prophet
-                    })
-                
-                # PROSES TOP-DOWN FORECASTING PER ITEM
-                item_forecasts = []
-                if kolom_produk:
-                    summary_items = df.groupby(kolom_produk)[kolom_qty].sum().reset_index()
-                    total_sales_all = summary_items[kolom_qty].sum()
-                    
-                    for index, row in summary_items.iterrows():
-                        nama = row[kolom_produk]
-                        hist_qty = row[kolom_qty]
-                        
-                        proporsi = hist_qty / total_sales_all if total_sales_all > 0 else 0
-                        est_90_days = int(round(proporsi * total_sarima_90))
-                        
-                        item_forecasts.append({
-                            'name': nama,
-                            'history': int(hist_qty),
-                            'forecast_90': est_90_days
-                        })
-                    
-                    # Urutkan dari penjualan tertinggi
-                    item_forecasts = sorted(item_forecasts, key=lambda x: x['history'], reverse=True)
-                
-                return render_template('timeseries.html', 
-                                       forecast_data=forecast_data,
-                                       item_forecasts=item_forecasts, # Data per item dikirim ke HTML
-                                       total_records=len(df_grouped), 
-                                       best_model="SARIMA",
-                                       last_date=last_data_date.strftime('%Y-%m-%d'),
-                                       total_riil=total_riil_historis)
-            except Exception as e:
-                return f"Gagal memproses analisis waktu. Error: {str(e)}", 500
-                
-    return render_template('timeseries.html', forecast_data=None, item_forecasts=None)
+    if request.method == "POST":
+        try:
+            uploaded_file = request.files.get(
+                "file"
+            )
 
-@app.route('/recommendation', methods=['GET', 'POST'])
+            if (
+                not uploaded_file
+                or uploaded_file.filename == ""
+            ):
+                raise ValueError(
+                    "Pilih file dataset Time Series terlebih dahulu."
+                )
+
+            if not allowed_file(
+                uploaded_file.filename
+            ):
+                raise ValueError(
+                    "Dataset Time Series harus berformat CSV."
+                )
+
+            raw_data = read_csv_flexible(
+                uploaded_file
+            )
+
+            result = process_timeseries(
+                raw_data
+            )
+
+            daily_result = result["harian"]
+            summary_result = result["ringkasan"]
+
+            daily_output = daily_result.copy()
+
+            daily_output["Tanggal"] = (
+                pd.to_datetime(
+                    daily_output["Tanggal"]
+                )
+                .dt.strftime("%d-%m-%Y")
+            )
+
+            daily_output.to_csv(
+                FILE_PREDIKSI_HARIAN,
+                index=False,
+                encoding="utf-8-sig"
+            )
+
+            summary_result.to_csv(
+                FILE_PREDIKSI_RINGKASAN,
+                index=False,
+                encoding="utf-8-sig"
+            )
+
+            first_product = str(
+                summary_result.iloc[0][
+                    "Product_Name"
+                ]
+            )
+
+            return redirect(
+                url_for(
+                    "timeseries",
+                    product_name=first_product,
+                    uploaded="1"
+                )
+            )
+
+        except Exception as error:
+            return render_template(
+                "timeseries.html",
+                **empty_timeseries_context(
+                    error_message=str(error)
+                )
+            )
+
+    selected_product = request.args.get(
+        "product_name",
+        default=None,
+        type=str
+    )
+
+    success_message = None
+
+    if request.args.get("uploaded") == "1":
+        success_message = (
+            "Prediksi seluruh produk berhasil diproses. "
+            "Pilih produk melalui dropdown untuk mengubah grafik."
+        )
+
+    try:
+        saved_context = load_saved_timeseries_context(
+            selected_product=selected_product,
+            success_message=success_message
+        )
+
+        if saved_context:
+            return render_template(
+                "timeseries.html",
+                **saved_context
+            )
+
+    except Exception as error:
+        return render_template(
+            "timeseries.html",
+            **empty_timeseries_context(
+                error_message=str(error)
+            )
+        )
+
+    return render_template(
+        "timeseries.html",
+        **empty_timeseries_context()
+    )
+
+
+@app.route(
+    "/recommendation",
+    methods=["GET", "POST"]
+)
 def recommendation():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return "Kunci file tidak ditemukan", 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return "Tidak ada file yang dipilih", 400
-            
-        if file and allowed_file(file.filename):
-            try:
-                nama_file = file.filename.lower()
-                if nama_file.endswith('.csv'):
-                    df = pd.read_csv(file, sep=None, engine='python', on_bad_lines='skip')
-                else:
-                    df = pd.read_excel(file)
-                    
-                df.columns = df.columns.str.strip()
-                
-                kolom_produk = 'Product_Name'
-                kolom_qty = 'Qty' if 'Qty' in df.columns else ('Quantity' if 'Quantity' in df.columns else None)
-                
-                if kolom_produk not in df.columns or not kolom_qty:
-                    return f"File harus memiliki kolom '{kolom_produk}' dan 'Qty'!", 400
-                
-                summary_items = df.groupby(kolom_produk)[kolom_qty].sum()
-                mean_qty = summary_items.mean()
-                
-                recommendation_data = []
-                count_restock = 0
-                count_maintain = 0
-                count_danger = 0
-                
-                for name, qty in summary_items.items():
-                    forecast_est = int(qty * 1.1)
-                    if qty > mean_qty:
-                        status = "Restock"
-                        strategy = "Lakukan penambahan persediaan dan buat bundling promosi lintas produk populer."
-                        count_restock += 1
-                    elif qty >= (mean_qty * 0.5):
-                        status = "Maintain"
-                        strategy = "Pertahankan kapasitas stok konvensional saat ini. Pola beli cenderung stabil."
-                        count_maintain += 1
-                    else:
-                        status = "Danger"
-                        strategy = "Gunakan strategi diskon cuci gudang untuk meminimalisir dead stock di gudang."
-                        count_danger += 1
-                        
-                    recommendation_data.append({
-                        "name": name,
-                        "forecast_qty": forecast_est,
-                        "linked_item": "Item Terkait",
-                        "status": status,
-                        "strategy": strategy
-                    })
-                    
-                return render_template('recommendation.html', 
-                                       recommendation_data=recommendation_data,
-                                       total_items=len(summary_items),
-                                       count_restock=count_restock,
-                                       count_maintain=count_maintain,
-                                       count_danger=count_danger)
-            except Exception as e:
-                return f"Gagal memproses rekomendasi. Error: {str(e)}", 500
-                
-    return render_template('recommendation.html', recommendation_data=None)
+    try:
+        if request.method == "POST":
+            uploaded_file = request.files.get(
+                "file"
+            )
 
-@app.route('/about')
+            if (
+                not uploaded_file
+                or uploaded_file.filename == ""
+            ):
+                raise ValueError(
+                    "Pilih file rekomendasi terlebih dahulu."
+                )
+
+            if not allowed_file(
+                uploaded_file.filename
+            ):
+                raise ValueError(
+                    "File rekomendasi harus berformat CSV."
+                )
+
+            data = read_csv_flexible(
+                uploaded_file
+            )
+
+            context = (
+                prepare_recommendation_data(
+                    data
+                )
+            )
+
+            return render_template(
+                "recommendation.html",
+                **context
+            )
+
+        recommendation_file = (
+            find_existing_file(
+                "rekomendasi_stok.csv"
+            )
+        )
+
+        if recommendation_file:
+            data = read_csv_flexible(
+                recommendation_file
+            )
+
+            context = (
+                prepare_recommendation_data(
+                    data
+                )
+            )
+
+            return render_template(
+                "recommendation.html",
+                **context
+            )
+
+        return render_template(
+            "recommendation.html",
+            recommendation_data=None
+        )
+
+    except Exception as error:
+        return render_template(
+            "recommendation.html",
+            recommendation_data=None,
+            error_message=str(error)
+        )
+
+
+@app.route("/about")
 def about():
-    return render_template('about.html')
+    return render_template(
+        "about.html"
+    )
 
-if __name__ == '__main__':
-    app.run(debug=True)
+
+@app.route("/health")
+def health():
+    return {
+        "status": "ok"
+    }
+
+
+if __name__ == "__main__":
+    port = int(
+        os.environ.get(
+            "PORT",
+            "5000"
+        )
+    )
+
+    debug_mode = (
+        os.environ.get(
+            "FLASK_DEBUG",
+            "0"
+        )
+        == "1"
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=debug_mode
+    )

@@ -1,0 +1,51 @@
+﻿No;Product Name;Prediksi 90 Hari;Kategori Prediksi;Produk_Pasangan;Support (%);Confidence (%);Lift;Hubungan Apriori;Rekomendasi
+1;Celana Jeans;9793.0;Tinggi;Hoodie;1.46;12.13;3.63;Kuat;Prioritas utama penambahan stok
+2;Celana Formal;8520.6;Tinggi;Kemeja;3.31;37.16;4.59;Kuat;Prioritas utama penambahan stok
+3;Jogger Pants;7900.83;Tinggi;Kaos;1.11;22.56;2.38;Kuat;Prioritas utama penambahan stok
+4;Kaos;7040.4;Tinggi;Celana Jeans;3.18;33.66;2.8;Kuat;Prioritas utama penambahan stok
+5;Kemeja;6910.78;Tinggi;Celana Formal;3.31;40.88;4.59;Kuat;Prioritas utama penambahan stok
+6;Polo Shirt;6464.57;Tinggi;Celana Jeans;2.34;33.2;2.77;Kuat;Prioritas utama penambahan stok
+7;Jaket;6238.16;Tinggi;Kaos;1.58;22.55;2.38;Kuat;Prioritas utama penambahan stok
+8;Hoodie;6083.29;Tinggi;Celana Jeans;1.46;43.63;3.63;Kuat;Prioritas utama penambahan stok
+9;Celana Chino;7537.23;Tinggi;-;;;;Tidak kuat;Penambahan stok berdasarkan hasil prediksi
+10;Setelan Anak;6166.84;Tinggi;-;;;;Tidak kuat;Penambahan stok berdasarkan hasil prediksi
+11;Kaos Anak;4746.95;Tinggi;-;;;;Tidak kuat;Penambahan stok berdasarkan hasil prediksi
+12;Dress Anak;4695.8;Tinggi;-;;;;Tidak kuat;Penambahan stok berdasarkan hasil prediksi
+13;Celana Anak;4562.88;Tinggi;-;;;;Tidak kuat;Penambahan stok berdasarkan hasil prediksi
+14;Blouse;4507.77;Sedang;Skirt;1.72;30.37;5.54;Kuat;Penambahan stok sebagai produk pendukung
+15;High-Waist Pants;3985.08;Sedang;Crop Shirt;1.6;34.04;7.78;Kuat;Penambahan stok sebagai produk pendukung
+16;Skirt;3718.97;Sedang;Blouse;1.72;31.39;5.54;Kuat;Penambahan stok sebagai produk pendukung
+17;Culottes;3486.26;Sedang;Casual Top;1.3;26.79;6.1;Kuat;Penambahan stok sebagai produk pendukung
+18;Kemeja Wanita;3356.84;Sedang;Pleated Pants;1.31;29.69;6.87;Kuat;Penambahan stok sebagai produk pendukung
+19;Palazzo Pants;3290.4;Sedang;Blouse;1.23;21.88;3.86;Kuat;Penambahan stok sebagai produk pendukung
+20;Crop Shirt;3224.36;Sedang;High-Waist Pants;1.6;36.62;7.78;Kuat;Penambahan stok sebagai produk pendukung
+21;Pleated Pants;3051.38;Sedang;Kemeja Wanita;1.31;30.21;6.87;Kuat;Penambahan stok sebagai produk pendukung
+22;Sneakers;2946.37;Sedang;Kaos Kaki;1.17;36.45;11.39;Kuat;Penambahan stok sebagai produk pendukung
+23;Kaos Kaki;2809.69;Sedang;Sneakers;1.17;36.68;11.39;Kuat;Penambahan stok sebagai produk pendukung
+24;Casual Top;2769.28;Sedang;Culottes;1.3;29.63;6.1;Kuat;Penambahan stok sebagai produk pendukung
+25;Chic Top;3644.83;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+26;Cardigan;3539.8;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+27;Tunic;3241.13;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+28;A-Line Dress;2987.37;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+29;Athleisure Set;2985.53;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+30;Oversized Shirt;2913.78;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+31;Bodycon Dress;2866.55;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+32;Slip Dress;2755.07;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+33;Vintage Top;2619.07;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+34;Heels;2615.57;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+35;Maxi Dress;2458.01;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+36;Wedges;1659.96;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+37;Flat Shoes;1659.24;Sedang;-;;;;Tidak kuat;Stok dipertahankan
+38;Sandal;1606.18;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+39;Sepatu Formal;1508.64;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+40;Boots;1406.6;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+41;Sneakers Anak;1314.23;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+42;Sandal Anak;1173.4;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+43;Totebag;1005.08;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+44;Casual;906.44;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+45;Loafers;888.68;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+46;Clutch;852.04;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+47;Sepatu Sekolah;751.6;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+48;Shoulder Bag;678.22;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+49;Mules;615.83;Rendah;-;;;;Tidak kuat;Stok minimum atau normal
+50;Handbag;501.33;Rendah;-;;;;Tidak kuat;Stok minimum atau normal

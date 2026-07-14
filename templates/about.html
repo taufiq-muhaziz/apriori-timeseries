@@ -4,100 +4,428 @@
 
 {% block content %}
 <div class="container-fluid">
+
     <div class="row mb-4">
         <div class="col-12">
             <h2 class="page-title">Tentang Penelitian</h2>
-            <p class="page-subtitle">Informasi detail mengenai pengembangan sistem dan metodologi skripsi.</p>
+            <p class="page-subtitle">
+                Informasi mengenai tujuan, ruang lingkup, metode, dan hasil
+                implementasi penelitian.
+            </p>
         </div>
     </div>
 
     <div class="row">
+
         <div class="col-lg-8">
-            <div class="card mb-4">
-                <div class="card-body">
+
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-body p-4">
+
                     <h5 class="card-title text-primary mb-3">
-                        <i class="fas fa-info-circle me-2"></i>Latar Belakang
+                        <i class="fas fa-book-open me-2"></i>
+                        Judul Penelitian
                     </h5>
-                    <p class="text-justify lh-lg">
-                        Sistem ini dikembangkan sebagai implementasi penelitian skripsi yang berfokus pada optimasi strategi penjualan. 
-                        Dengan menggabungkan analisis pola beli konsumen melalui <strong>Algoritma Apriori</strong> dan prediksi tren masa depan menggunakan berbagai metode <strong>Forecasting Time Series</strong>, 
-                        sistem ini diharapkan dapat memberikan wawasan strategis bagi manajemen dalam pengambilan keputusan stok dan promosi produk.
-                    </p>
-                    
-                    <div class="mt-4 p-3 bg-light border-start border-primary border-4 rounded">
-                        <small class="text-muted d-block mb-1">Tujuan Penelitian:</small>
-                        <span class="fw-bold">Transformasi data transaksi mentah menjadi informasi cerdas yang bernilai bisnis.</span>
+
+                    <div class="p-3 bg-light border-start border-primary border-4 rounded mb-4">
+                        <p class="fw-bold mb-0 text-uppercase">
+                            Implementasi Apriori dan Time Series untuk Analisis
+                            Pola Belanja dan Prediksi Penjualan Menjelang Lebaran
+                            di Matahari Ciputra Jakarta
+                        </p>
                     </div>
+
+                    <h5 class="card-title text-primary mb-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Latar Belakang
+                    </h5>
+
+                    <p class="text-justify lh-lg mb-3">
+                        Penelitian ini dilakukan untuk membantu proses analisis
+                        data transaksi penjualan dalam mengetahui pola pembelian
+                        konsumen dan memperkirakan jumlah penjualan produk pada
+                        periode mendatang. Data transaksi yang tersedia tidak
+                        hanya digunakan sebagai catatan penjualan, tetapi diolah
+                        menjadi informasi yang dapat mendukung pengelolaan
+                        persediaan produk.
+                    </p>
+
+                    <p class="text-justify lh-lg mb-0">
+                        Algoritma Apriori digunakan untuk menemukan hubungan
+                        pembelian antarproduk berdasarkan nilai support,
+                        confidence, dan lift. Sementara itu, metode Time Series
+                        digunakan untuk mengevaluasi model ARIMA, SARIMA, dan
+                        Prophet dalam melakukan prediksi penjualan. Berdasarkan
+                        hasil evaluasi, ARIMA digunakan sebagai model terbaik
+                        untuk menghasilkan prediksi penjualan selama 90 hari.
+                    </p>
+
                 </div>
             </div>
+
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-body p-4">
+
+                    <h5 class="card-title text-primary mb-3">
+                        <i class="fas fa-bullseye me-2"></i>
+                        Tujuan Penelitian
+                    </h5>
+
+                    <p class="text-justify lh-lg mb-3">
+                        Penelitian ini bertujuan menerapkan algoritma Apriori
+                        dan metode Time Series dalam sebuah aplikasi berbasis web
+                        untuk menghasilkan informasi pola pembelian, prediksi
+                        penjualan, dan rekomendasi pengelolaan stok.
+                    </p>
+
+                    <div class="row g-3">
+
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded border h-100">
+                                <div class="text-primary mb-2">
+                                    <i class="fas fa-cart-shopping fa-lg"></i>
+                                </div>
+
+                                <h6 class="fw-bold">Pola Pembelian</h6>
+
+                                <p class="small text-muted mb-0">
+                                    Mengetahui produk yang memiliki kecenderungan
+                                    dibeli secara bersamaan.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded border h-100">
+                                <div class="text-success mb-2">
+                                    <i class="fas fa-chart-line fa-lg"></i>
+                                </div>
+
+                                <h6 class="fw-bold">Prediksi Penjualan</h6>
+
+                                <p class="small text-muted mb-0">
+                                    Memperkirakan jumlah penjualan produk selama
+                                    90 hari mendatang.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded border h-100">
+                                <div class="text-warning mb-2">
+                                    <i class="fas fa-boxes-stacked fa-lg"></i>
+                                </div>
+
+                                <h6 class="fw-bold">Rekomendasi Stok</h6>
+
+                                <p class="small text-muted mb-0">
+                                    Menentukan prioritas pengelolaan persediaan
+                                    berdasarkan hasil integrasi analisis.
+                                </p>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
         </div>
 
         <div class="col-lg-4">
-            <div class="card mb-4 text-center">
-                <div class="card-body">
+
+            <div class="card mb-4 text-center shadow-sm border-0">
+                <div class="card-body p-4">
+
                     <div class="mb-3">
-                        <img src="{{ url_for('static', filename='img/Taufiq Muhaziz.jpeg') }}" 
-                             alt="Foto Taufiq Muhaziz" 
-                             class="rounded-circle img-thumbnail shadow-sm" 
-                             style="width: 150px; height: 150px; object-fit: cover;">
+                        <img
+                            src="{{ url_for('static', filename='img/Taufiq Muhaziz.jpeg') }}"
+                            alt="Foto Taufiq Muhaziz"
+                            class="rounded-circle img-thumbnail shadow-sm"
+                            style="width: 150px; height: 150px; object-fit: cover;"
+                        >
                     </div>
-                    <h5 class="mb-1 fw-bold">Taufiq Muhaziz</h5>
-                    <p class="text-muted small mb-0">NIM: 221011400592</p>
-                    <p class="text-primary small mb-3">Teknik Informatika S1</p>
+
+                    <h5 class="mb-1 fw-bold">
+                        Taufiq Muhaziz
+                    </h5>
+
+                    <p class="text-muted small mb-1">
+                        NIM: 221011400592
+                    </p>
+
+                    <p class="text-primary small mb-3">
+                        Program Studi Teknik Informatika
+                    </p>
+
                     <hr>
+
                     <div class="text-start">
-                        <div class="mb-2">
-                            <small class="text-muted d-block">Topik Penelitian:</small>
-                            <span class="small fw-600">Data Mining</span>
+
+                        <div class="mb-3">
+                            <small class="text-muted d-block">
+                                Bidang Penelitian
+                            </small>
+
+                            <span class="small fw-semibold">
+                                Data Mining dan Time Series
+                            </span>
                         </div>
+
+                        <div class="mb-3">
+                            <small class="text-muted d-block">
+                                Objek Penelitian
+                            </small>
+
+                            <span class="small fw-semibold">
+                                Matahari Ciputra Jakarta
+                            </span>
+                        </div>
+
                         <div>
-                            <small class="text-muted d-block">Tahun Pengembangan:</small>
-                            <span class="small fw-600">2026</span>
+                            <small class="text-muted d-block">
+                                Tahun Pengembangan
+                            </small>
+
+                            <span class="small fw-semibold">
+                                2026
+                            </span>
                         </div>
+
                     </div>
+
                 </div>
             </div>
+
+            <div class="card mb-4 shadow-sm border-0">
+                <div class="card-body">
+
+                    <h6 class="fw-bold text-primary mb-3">
+                        <i class="fas fa-database me-2"></i>
+                        Data Penelitian
+                    </h6>
+
+                    <p class="small text-muted text-justify mb-3">
+                        Sistem menggunakan data transaksi untuk analisis Apriori
+                        dan data penjualan harian untuk proses Time Series.
+                    </p>
+
+                    <div class="d-flex justify-content-between border-top pt-3">
+                        <span class="small text-muted">
+                            Produk dianalisis
+                        </span>
+
+                        <span class="small fw-bold">
+                            50 produk
+                        </span>
+                    </div>
+
+                    <div class="d-flex justify-content-between border-top pt-3 mt-3">
+                        <span class="small text-muted">
+                            Periode prediksi
+                        </span>
+
+                        <span class="small fw-bold">
+                            90 hari
+                        </span>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="row mb-4">
+
+        <div class="col-12">
+
+            <h5 class="mb-3">
+                <i class="fas fa-microscope me-2 text-primary"></i>
+                Metode yang Diimplementasikan
+            </h5>
+
+        </div>
+
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+
+                    <div class="text-primary mb-3">
+                        <i class="fas fa-project-diagram fa-2x"></i>
+                    </div>
+
+                    <h6 class="fw-bold">
+                        Apriori
+                    </h6>
+
+                    <p class="small text-muted mb-0">
+                        Digunakan untuk menemukan aturan asosiasi antarproduk
+                        melalui nilai support, confidence, dan lift.
+                    </p>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+
+                    <div class="text-success mb-3">
+                        <i class="fas fa-chart-line fa-2x"></i>
+                    </div>
+
+                    <h6 class="fw-bold">
+                        ARIMA
+                    </h6>
+
+                    <p class="small text-muted mb-2">
+                        Digunakan untuk melakukan prediksi berdasarkan pola
+                        data penjualan historis.
+                    </p>
+
+                    <span class="badge bg-success">
+                        Model Terbaik
+                    </span>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+
+                    <div class="text-warning mb-3">
+                        <i class="fas fa-calendar-days fa-2x"></i>
+                    </div>
+
+                    <h6 class="fw-bold">
+                        SARIMA
+                    </h6>
+
+                    <p class="small text-muted mb-0">
+                        Digunakan sebagai model pembanding yang dapat menangkap
+                        pola musiman pada data penjualan.
+                    </p>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+
+                    <div class="text-danger mb-3">
+                        <i class="fas fa-wand-magic-sparkles fa-2x"></i>
+                    </div>
+
+                    <h6 class="fw-bold">
+                        Prophet
+                    </h6>
+
+                    <p class="small text-muted mb-0">
+                        Digunakan sebagai model pembanding dalam memprediksi
+                        tren dan perubahan pola penjualan.
+                    </p>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+
+                    <h5 class="text-primary mb-4">
+                        <i class="fas fa-diagram-project me-2"></i>
+                        Alur Analisis Sistem
+                    </h5>
+
+                    <div class="row g-3 text-center">
+
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded border h-100">
+                                <div class="text-primary mb-2">
+                                    <i class="fas fa-file-csv fa-2x"></i>
+                                </div>
+
+                                <h6 class="fw-bold">
+                                    Input Data
+                                </h6>
+
+                                <p class="small text-muted mb-0">
+                                    Pengguna mengunggah data transaksi dan
+                                    penjualan harian.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded border h-100">
+                                <div class="text-success mb-2">
+                                    <i class="fas fa-cart-shopping fa-2x"></i>
+                                </div>
+
+                                <h6 class="fw-bold">
+                                    Analisis Apriori
+                                </h6>
+
+                                <p class="small text-muted mb-0">
+                                    Sistem menghasilkan aturan asosiasi
+                                    antarproduk.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded border h-100">
+                                <div class="text-warning mb-2">
+                                    <i class="fas fa-chart-area fa-2x"></i>
+                                </div>
+
+                                <h6 class="fw-bold">
+                                    Prediksi ARIMA
+                                </h6>
+
+                                <p class="small text-muted mb-0">
+                                    Sistem menghasilkan prediksi penjualan
+                                    selama 90 hari.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="p-3 bg-light rounded border h-100">
+                                <div class="text-danger mb-2">
+                                    <i class="fas fa-boxes-stacked fa-2x"></i>
+                                </div>
+
+                                <h6 class="fw-bold">
+                                    Rekomendasi Stok
+                                </h6>
+
+                                <p class="small text-muted mb-0">
+                                    Sistem menentukan prioritas pengelolaan
+                                    persediaan produk.
+                                </p>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
         </div>
     </div>
 
-    <h5 class="mb-3 mt-2"><i class="fas fa-microscope me-2 text-primary"></i>Metodologi yang Diimplementasikan</h5>
-    <div class="row g-3">
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-primary mb-2"><i class="fas fa-project-diagram fa-2x"></i></div>
-                    <h6 class="fw-bold">Apriori</h6>
-                    <p class="small text-muted mb-0">Digunakan untuk Market Basket Analysis (Analisis Pola Asosiasi Penjualan).</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-success mb-2"><i class="fas fa-chart-line fa-2x"></i></div>
-                    <h6 class="fw-bold">ARIMA</h6>
-                    <p class="small text-muted mb-0">Model statistik untuk peramalan data deret waktu (Forecasting).</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-warning mb-2"><i class="fas fa-calendar-check fa-2x"></i></div>
-                    <h6 class="fw-bold">SARIMA</h6>
-                    <p class="small text-muted mb-0">Pengembangan ARIMA dengan mempertimbangkan efek musiman (Seasonality).</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-danger mb-2"><i class="fas fa-magic fa-2x"></i></div>
-                    <h6 class="fw-bold">Prophet</h6>
-                    <p class="small text-muted mb-0">Prosedur peramalan otomatis buatan Facebook untuk data yang kompleks.</p>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}

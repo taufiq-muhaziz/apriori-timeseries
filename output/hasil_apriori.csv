@@ -1,0 +1,25 @@
+﻿Antecedent;Consequent;Support (%);Confidence (%);Lift
+Sneakers;Kaos Kaki;1.17;36.45;11.39
+Kaos Kaki;Sneakers;1.17;36.68;11.39
+Crop Shirt;High-Waist Pants;1.6;36.62;7.78
+High-Waist Pants;Crop Shirt;1.6;34.04;7.78
+Pleated Pants;Kemeja Wanita;1.31;30.21;6.87
+Kemeja Wanita;Pleated Pants;1.31;29.69;6.87
+Culottes;Casual Top;1.3;26.79;6.1
+Casual Top;Culottes;1.3;29.63;6.1
+Skirt;Blouse;1.72;31.39;5.54
+Blouse;Skirt;1.72;30.37;5.54
+Kemeja;Celana Formal;3.31;40.88;4.59
+Celana Formal;Kemeja;3.31;37.16;4.59
+Palazzo Pants;Blouse;1.23;21.88;3.86
+Blouse;Palazzo Pants;1.23;21.69;3.86
+Hoodie;Celana Jeans;1.46;43.63;3.63
+Celana Jeans;Hoodie;1.46;12.13;3.63
+Celana Jeans;Kaos;3.18;26.52;2.8
+Kaos;Celana Jeans;3.18;33.66;2.8
+Polo Shirt;Celana Jeans;2.34;33.2;2.77
+Celana Jeans;Polo Shirt;2.34;19.52;2.77
+Jogger Pants;Kaos;1.11;22.56;2.38
+Kaos;Jogger Pants;1.11;11.78;2.38
+Jaket;Kaos;1.58;22.55;2.38
+Kaos;Jaket;1.58;16.71;2.38
