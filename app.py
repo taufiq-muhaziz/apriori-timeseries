@@ -1,4 +1,7 @@
 from pathlib import Path
+import csv
+import gc
+import io
 import os
 import re
 
@@ -6,6 +9,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, render_template, request, redirect, url_for
 from mlxtend.frequent_patterns import apriori, association_rules
+from mlxtend.preprocessing import TransactionEncoder
 from statsmodels.tsa.arima.model import ARIMA
 
 
@@ -67,6 +71,190 @@ def read_csv_flexible(source):
         encoding="utf-8-sig",
         on_bad_lines="skip"
     )
+
+
+def read_apriori_csv(file_storage):
+    """
+    Membaca CSV khusus untuk proses Apriori.
+
+    Semua kolom dibaca sebagai teks terlebih dahulu agar nama produk,
+    merek, atau nilai teks seperti "Bustong" tidak dipaksa menjadi angka.
+    Fungsi ini hanya mengambil Transaction_ID dan Product_Name sehingga
+    proses Apriori lebih ringan dan tidak memengaruhi proses Time Series.
+    """
+    if file_storage is None:
+        raise ValueError("File CSV Apriori belum dipilih.")
+
+    if not getattr(file_storage, "filename", ""):
+        raise ValueError("Nama file CSV Apriori tidak ditemukan.")
+
+    file_storage.stream.seek(0)
+    raw_data = file_storage.stream.read()
+
+    if not raw_data:
+        raise ValueError("File CSV Apriori kosong.")
+
+    decoded_text = None
+    selected_encoding = None
+
+    for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            decoded_text = raw_data.decode(encoding)
+            selected_encoding = encoding
+            break
+        except UnicodeDecodeError:
+            continue
+
+    if decoded_text is None:
+        raise ValueError(
+            "Encoding file tidak didukung. "
+            "Simpan ulang file sebagai CSV UTF-8."
+        )
+
+    # Deteksi delimiter dari bagian awal file, lalu gunakan parser C
+    # agar pembacaan lebih cepat daripada sep=None dengan engine Python.
+    sample = decoded_text[:10000]
+
+    try:
+        dialect = csv.Sniffer().sniff(
+            sample,
+            delimiters=",;\t|"
+        )
+        separator = dialect.delimiter
+    except csv.Error:
+        first_line = next(
+            (
+                line
+                for line in decoded_text.splitlines()
+                if line.strip()
+            ),
+            ""
+        )
+        candidates = [",", ";", "\t", "|"]
+        separator = max(
+            candidates,
+            key=lambda item: first_line.count(item)
+        )
+
+        if first_line.count(separator) == 0:
+            separator = ","
+
+    read_options = {
+        "sep": separator,
+        "dtype": str,
+        "keep_default_na": False,
+        "on_bad_lines": "skip"
+    }
+
+    try:
+        data = pd.read_csv(
+            io.StringIO(decoded_text),
+            engine="c",
+            **read_options
+        )
+    except Exception:
+        # Fallback untuk CSV dengan struktur yang tidak didukung parser C.
+        data = pd.read_csv(
+            io.StringIO(decoded_text),
+            engine="python",
+            **read_options
+        )
+
+    if data.empty:
+        raise ValueError("File CSV Apriori tidak memiliki baris data.")
+
+    data = normalize_columns(data)
+
+    transaction_col = find_column(
+        data,
+        [
+            "Transaction_ID",
+            "Transaction ID",
+            "Kode Transaksi",
+            "ID Transaksi",
+            "TransactionID"
+        ]
+    )
+    product_col = find_column(
+        data,
+        [
+            "Product_Name",
+            "Product Name",
+            "Nama Produk",
+            "Produk",
+            "ProductName"
+        ]
+    )
+
+    missing_columns = []
+
+    if not transaction_col:
+        missing_columns.append("Transaction_ID")
+
+    if not product_col:
+        missing_columns.append("Product_Name")
+
+    if missing_columns:
+        available_columns = ", ".join(
+            data.columns.astype(str).tolist()
+        )
+        raise ValueError(
+            "Kolom wajib tidak ditemukan: "
+            + ", ".join(missing_columns)
+            + ". Kolom yang terbaca: "
+            + available_columns
+        )
+
+    clean_data = data[
+        [transaction_col, product_col]
+    ].copy()
+    clean_data.columns = [
+        "Transaction_ID",
+        "Product_Name"
+    ]
+
+    clean_data["Transaction_ID"] = (
+        clean_data["Transaction_ID"]
+        .astype(str)
+        .str.strip()
+    )
+    clean_data["Product_Name"] = (
+        clean_data["Product_Name"]
+        .astype(str)
+        .str.strip()
+    )
+
+    clean_data = clean_data[
+        (clean_data["Transaction_ID"] != "")
+        & (clean_data["Product_Name"] != "")
+    ].copy()
+
+    # Apriori hanya membutuhkan keberadaan produk dalam transaksi.
+    # Produk yang sama di transaksi yang sama cukup dihitung satu kali.
+    clean_data = clean_data.drop_duplicates(
+        subset=[
+            "Transaction_ID",
+            "Product_Name"
+        ]
+    ).reset_index(drop=True)
+
+    if clean_data.empty:
+        raise ValueError(
+            "Tidak ada transaksi valid yang dapat dianalisis."
+        )
+
+    app.logger.info(
+        "CSV Apriori dibaca | file=%s | encoding=%s | "
+        "separator=%r | baris=%s | transaksi=%s | produk=%s",
+        file_storage.filename,
+        selected_encoding,
+        separator,
+        len(clean_data),
+        clean_data["Transaction_ID"].nunique(),
+        clean_data["Product_Name"].nunique()
+    )
+
+    return clean_data
 
 
 def normalize_columns(data):
@@ -759,6 +947,12 @@ def process_apriori(
     min_support,
     min_confidence
 ):
+    """
+    Menjalankan Apriori menggunakan market basket sparse.
+
+    Perubahan ini hanya berlaku untuk proses Apriori. Proses Time Series,
+    rekomendasi, dan halaman lain tetap menggunakan kode sebelumnya.
+    """
     data = normalize_columns(data)
 
     transaction_col = find_column(
@@ -766,7 +960,8 @@ def process_apriori(
         [
             "Transaction_ID",
             "Transaction ID",
-            "Kode Transaksi"
+            "Kode Transaksi",
+            "ID Transaksi"
         ]
     )
     product_col = find_column(
@@ -774,7 +969,8 @@ def process_apriori(
         [
             "Product_Name",
             "Product Name",
-            "Nama Produk"
+            "Nama Produk",
+            "Produk"
         ]
     )
 
@@ -784,44 +980,118 @@ def process_apriori(
             "Transaction_ID dan Product_Name."
         )
 
-    data = data.dropna(
-        subset=[
-            transaction_col,
-            product_col
-        ]
-    )
+    clean_data = data[
+        [transaction_col, product_col]
+    ].copy()
+    clean_data.columns = [
+        "Transaction_ID",
+        "Product_Name"
+    ]
 
-    data[product_col] = (
-        data[product_col]
+    clean_data["Transaction_ID"] = (
+        clean_data["Transaction_ID"]
+        .astype(str)
+        .str.strip()
+    )
+    clean_data["Product_Name"] = (
+        clean_data["Product_Name"]
         .astype(str)
         .str.strip()
     )
 
-    basket = (
-        data.groupby(
-            [transaction_col, product_col]
-        )
-        .size()
-        .unstack(fill_value=0)
+    clean_data = clean_data[
+        (clean_data["Transaction_ID"] != "")
+        & (clean_data["Product_Name"] != "")
+    ].drop_duplicates(
+        subset=[
+            "Transaction_ID",
+            "Product_Name"
+        ]
     )
 
-    basket_sets = basket.gt(0)
+    if clean_data.empty:
+        raise ValueError(
+            "Dataset Apriori tidak memiliki transaksi valid."
+        )
+
+    total_transactions = int(
+        clean_data["Transaction_ID"].nunique()
+    )
+    total_products = int(
+        clean_data["Product_Name"].nunique()
+    )
+
+    # Bentuk daftar produk pada setiap transaksi.
+    transactions = (
+        clean_data.groupby(
+            "Transaction_ID",
+            sort=False
+        )["Product_Name"]
+        .agg(list)
+        .tolist()
+    )
+
+    if not transactions:
+        raise ValueError(
+            "Keranjang transaksi tidak berhasil dibentuk."
+        )
+
+    transaction_encoder = TransactionEncoder()
+    encoded_sparse = (
+        transaction_encoder
+        .fit(transactions)
+        .transform(
+            transactions,
+            sparse=True
+        )
+    )
+
+    basket_sets = pd.DataFrame.sparse.from_spmatrix(
+        encoded_sparse,
+        columns=transaction_encoder.columns_
+    )
+
+    app.logger.info(
+        "Market basket sparse | transaksi=%s | produk=%s | bentuk=%s",
+        total_transactions,
+        total_products,
+        basket_sets.shape
+    )
 
     frequent_itemsets = apriori(
         basket_sets,
         min_support=min_support,
-        use_colnames=True
+        use_colnames=True,
+        low_memory=True
     )
 
     if frequent_itemsets.empty:
+        pd.DataFrame(
+            columns=[
+                "Antecedent",
+                "Consequent",
+                "Support (%)",
+                "Confidence (%)",
+                "Lift"
+            ]
+        ).to_csv(
+            FILE_HASIL_APRIORI,
+            sep=";",
+            index=False,
+            encoding="utf-8-sig"
+        )
+
+        del basket_sets
+        del encoded_sparse
+        del transactions
+        del transaction_encoder
+        del clean_data
+        gc.collect()
+
         return {
             "rules_data": [],
-            "total_transactions": len(
-                basket_sets
-            ),
-            "total_products": len(
-                basket_sets.columns
-            ),
+            "total_transactions": total_transactions,
+            "total_products": total_products,
             "total_rules": 0
         }
 
@@ -926,17 +1196,29 @@ def process_apriori(
         encoding="utf-8-sig"
     )
 
+    total_rules = len(rules_formatted)
+
+    app.logger.info(
+        "Apriori selesai | frequent_itemsets=%s | rules=%s",
+        len(frequent_itemsets),
+        total_rules
+    )
+
+    # Bersihkan objek besar sesudah hasil yang dibutuhkan selesai dibuat.
+    del basket_sets
+    del encoded_sparse
+    del transactions
+    del transaction_encoder
+    del clean_data
+    del frequent_itemsets
+    del rules
+    gc.collect()
+
     return {
         "rules_data": rules_formatted,
-        "total_transactions": len(
-            basket_sets
-        ),
-        "total_products": len(
-            basket_sets.columns
-        ),
-        "total_rules": len(
-            rules_formatted
-        )
+        "total_transactions": total_transactions,
+        "total_products": total_products,
+        "total_rules": total_rules
     }
 
 
@@ -1134,72 +1416,150 @@ def dashboard():
         "index.html"
     )
 
-
 @app.route(
     "/apriori",
     methods=["GET", "POST"]
 )
 def apriori_route():
+    """
+    Menampilkan halaman Apriori dan memproses dataset CSV
+    yang diunggah oleh pengguna.
+    """
+
+    min_support = MIN_SUPPORT_DEFAULT
+    min_confidence = MIN_CONFIDENCE_DEFAULT
+
     if request.method == "GET":
         return render_template(
             "apriori.html",
             rules_data=None,
-            min_support=MIN_SUPPORT_DEFAULT,
-            min_confidence=MIN_CONFIDENCE_DEFAULT
+            total_transactions=0,
+            total_products=0,
+            total_rules=0,
+            min_support=min_support,
+            min_confidence=min_confidence,
+            error_message=None
         )
 
     try:
-        uploaded_file = request.files.get(
-            "file"
-        )
 
-        if (
-            not uploaded_file
-            or uploaded_file.filename == ""
-        ):
+        uploaded_file = request.files.get("file")
+
+        if uploaded_file is None:
+            raise ValueError(
+                "File dataset Apriori tidak ditemukan."
+            )
+
+        if uploaded_file.filename == "":
             raise ValueError(
                 "Pilih file dataset Apriori terlebih dahulu."
             )
 
-        if not allowed_file(
-            uploaded_file.filename
-        ):
+
+        if not allowed_file(uploaded_file.filename):
             raise ValueError(
                 "Dataset Apriori harus berformat CSV."
             )
 
-        min_support = float(
-            request.form.get(
-                "min_support",
-                MIN_SUPPORT_DEFAULT
-            )
+        min_support_input = request.form.get(
+            "min_support",
+            MIN_SUPPORT_DEFAULT
         )
 
-        min_confidence = float(
-            request.form.get(
-                "min_confidence",
-                MIN_CONFIDENCE_DEFAULT
-            )
+        min_confidence_input = request.form.get(
+            "min_confidence",
+            MIN_CONFIDENCE_DEFAULT
         )
+
+        try:
+            min_support = float(min_support_input)
+        except (TypeError, ValueError):
+            raise ValueError(
+                "Minimum support harus berupa angka."
+            )
+
+        try:
+            min_confidence = float(min_confidence_input)
+        except (TypeError, ValueError):
+            raise ValueError(
+                "Minimum confidence harus berupa angka."
+            )
+
 
         if not 0 < min_support <= 1:
             raise ValueError(
-                "Minimum support harus berada pada rentang 0 sampai 1."
+                "Minimum support harus berada pada "
+                "rentang lebih dari 0 sampai 1."
             )
 
         if not 0 < min_confidence <= 1:
             raise ValueError(
-                "Minimum confidence harus berada pada rentang 0 sampai 1."
+                "Minimum confidence harus berada pada "
+                "rentang lebih dari 0 sampai 1."
             )
 
-        data = read_csv_flexible(
+        data = read_apriori_csv(
             uploaded_file
         )
 
-        context = process_apriori(
-            data,
+        if data.empty:
+            raise ValueError(
+                "Dataset tidak memiliki data yang dapat diproses."
+            )
+
+        app.logger.info(
+            "Memulai Apriori | file=%s | baris=%s | "
+            "transaksi=%s | produk=%s | support=%s | "
+            "confidence=%s",
+            uploaded_file.filename,
+            len(data),
+            data["Transaction_ID"].nunique(),
+            data["Product_Name"].nunique(),
             min_support,
             min_confidence
+        )
+
+
+        context = process_apriori(
+            data=data,
+            min_support=min_support,
+            min_confidence=min_confidence
+        )
+        
+        if not isinstance(context, dict):
+            raise ValueError(
+                "Hasil proses Apriori tidak memiliki "
+                "format yang benar."
+            )
+
+
+        context.setdefault(
+            "rules_data",
+            []
+        )
+
+        context.setdefault(
+            "total_transactions",
+            data["Transaction_ID"].nunique()
+        )
+
+        context.setdefault(
+            "total_products",
+            data["Product_Name"].nunique()
+        )
+
+        context.setdefault(
+            "total_rules",
+            len(context["rules_data"])
+        )
+
+
+        app.logger.info(
+            "Apriori berhasil | transaksi=%s | "
+            "produk=%s | aturan=%s",
+            context["total_transactions"],
+            context["total_products"],
+            context["total_rules"]
         )
 
         return render_template(
@@ -1210,13 +1570,44 @@ def apriori_route():
             error_message=None
         )
 
-    except Exception as error:
+
+
+    except ValueError as error:
+        app.logger.warning(
+            "Validasi Apriori gagal: %s",
+            error
+        )
+
         return render_template(
             "apriori.html",
             rules_data=None,
-            min_support=MIN_SUPPORT_DEFAULT,
-            min_confidence=MIN_CONFIDENCE_DEFAULT,
+            total_transactions=0,
+            total_products=0,
+            total_rules=0,
+            min_support=min_support,
+            min_confidence=min_confidence,
             error_message=str(error)
+        )
+
+
+    except Exception as error:
+        app.logger.exception(
+            "Terjadi kesalahan saat menjalankan Apriori."
+        )
+
+        return render_template(
+            "apriori.html",
+            rules_data=None,
+            total_transactions=0,
+            total_products=0,
+            total_rules=0,
+            min_support=min_support,
+            min_confidence=min_confidence,
+            error_message=(
+                "Terjadi kesalahan saat memproses dataset. "
+                "Silakan periksa struktur file CSV dan coba kembali. "
+                f"Detail: {error}"
+            )
         )
 
 
