@@ -22,9 +22,6 @@ app.secret_key = os.environ.get(
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 
-# ============================================================
-# KONFIGURASI FOLDER DAN FILE
-# ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "output"
@@ -48,10 +45,6 @@ TOP_PRODUCTS = 50
 FORECAST_HORIZON = 90
 ARIMA_ORDER = (2, 1, 2)
 
-
-# ============================================================
-# FUNGSI UMUM
-# ============================================================
 
 def allowed_file(filename):
     return (
@@ -112,8 +105,7 @@ def read_apriori_csv(file_storage):
             "Simpan ulang file sebagai CSV UTF-8."
         )
 
-    # Deteksi delimiter dari bagian awal file, lalu gunakan parser C
-    # agar pembacaan lebih cepat daripada sep=None dengan engine Python.
+   
     sample = decoded_text[:10000]
 
     try:
@@ -230,8 +222,7 @@ def read_apriori_csv(file_storage):
         & (clean_data["Product_Name"] != "")
     ].copy()
 
-    # Apriori hanya membutuhkan keberadaan produk dalam transaksi.
-    # Produk yang sama di transaksi yang sama cukup dihitung satu kali.
+
     clean_data = clean_data.drop_duplicates(
         subset=[
             "Transaction_ID",
@@ -303,7 +294,7 @@ def numeric_series(series):
         .str.strip()
     )
 
-    # Jika angka memakai format Indonesia, misalnya 1.234,50
+    
     contains_comma = values.str.contains(",", regex=False, na=False)
     contains_dot = values.str.contains(".", regex=False, na=False)
 
@@ -340,9 +331,6 @@ def find_existing_file(filename):
     return None
 
 
-# ============================================================
-# EVALUASI MODEL
-# ============================================================
 
 def get_evaluation_data():
     """
@@ -378,10 +366,6 @@ def get_evaluation_data():
         }
     ]
 
-
-# ============================================================
-# PROSES TIME SERIES
-# ============================================================
 
 def validate_timeseries_dataset(data):
     data = normalize_columns(data)
@@ -620,8 +604,7 @@ def process_timeseries(data):
                 freq="D"
             )
 
-            # Nilai tidak ditambah noise/angka acak.
-            # Fluktuasi yang muncul berasal dari hasil model ARIMA.
+            
             rounded_prediction = np.round(
                 prediction,
                 2
@@ -804,7 +787,7 @@ def build_timeseries_context(
 
     selected_product = requested_product
 
-    # PENTING: kirim seluruh produk ke JavaScript.
+   
     all_forecast_records = []
 
     sorted_daily_data = daily_data.sort_values(
@@ -939,10 +922,6 @@ def load_saved_timeseries_context(
     )
 
 
-# ============================================================
-# PROSES APRIORI
-# ============================================================
-
 def process_apriori(
     data,
     min_support,
@@ -1023,8 +1002,6 @@ def process_apriori(
             "Dataset Apriori tidak memiliki transaksi valid."
         )
 
-    # Ubah ID transaksi dan nama produk menjadi kode integer.
-    # Cara ini menghindari pembuatan list Python per transaksi.
     transaction_codes, transaction_names = pd.factorize(
         clean_data["Transaction_ID"],
         sort=False
@@ -1058,7 +1035,6 @@ def process_apriori(
         dtype=np.uint8
     )
 
-    # Pastikan setiap kombinasi transaksi-produk bernilai boolean.
     encoded_sparse.data[:] = 1
     encoded_sparse = encoded_sparse.astype(bool)
 
@@ -1074,8 +1050,6 @@ def process_apriori(
         basket_sets.shape
     )
 
-    # Hasil aplikasi hanya memakai rule A -> B, sehingga itemset
-    # dengan panjang lebih dari 2 tidak diperlukan.
     frequent_itemsets = apriori(
         basket_sets,
         min_support=min_support,
@@ -1222,10 +1196,6 @@ def process_apriori(
         "total_rules": len(rules_formatted)
     }
 
-
-# ============================================================
-# PROSES REKOMENDASI
-# ============================================================
 
 def prepare_recommendation_data(data):
     data = normalize_columns(data)
@@ -1406,10 +1376,6 @@ def prepare_recommendation_data(data):
         )
     }
 
-
-# ============================================================
-# ROUTE FLASK
-# ============================================================
 
 @app.route("/")
 def dashboard():
