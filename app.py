@@ -10,6 +10,7 @@ import pandas as pd
 from flask import Flask, render_template, request, redirect, url_for
 from mlxtend.frequent_patterns import apriori, association_rules
 from mlxtend.preprocessing import TransactionEncoder
+from scipy.sparse import csr_matrix
 from statsmodels.tsa.arima.model import ARIMA
 
 
@@ -948,10 +949,12 @@ def process_apriori(
     min_confidence
 ):
     """
-    Menjalankan Apriori menggunakan market basket sparse.
+    Menjalankan Apriori dengan market basket sparse.
 
-    Perubahan ini hanya berlaku untuk proses Apriori. Proses Time Series,
-    rekomendasi, dan halaman lain tetap menggunakan kode sebelumnya.
+    Versi ini tidak memakai groupby().agg(list), sehingga lebih cepat
+    dan lebih hemat memori untuk dataset transaksi berukuran besar.
+    Karena hasil akhir aplikasi hanya menggunakan aturan satu produk
+    menuju satu produk, pencarian itemset dibatasi sampai panjang 2.
     """
     data = normalize_columns(data)
 
@@ -960,8 +963,7 @@ def process_apriori(
         [
             "Transaction_ID",
             "Transaction ID",
-            "Kode Transaksi",
-            "ID Transaksi"
+            "Kode Transaksi"
         ]
     )
     product_col = find_column(
@@ -969,8 +971,7 @@ def process_apriori(
         [
             "Product_Name",
             "Product Name",
-            "Nama Produk",
-            "Produk"
+            "Nama Produk"
         ]
     )
 
@@ -980,6 +981,7 @@ def process_apriori(
             "Transaction_ID dan Product_Name."
         )
 
+    # Hanya ambil dua kolom yang benar-benar dibutuhkan Apriori.
     clean_data = data[
         [transaction_col, product_col]
     ].copy()
@@ -987,6 +989,13 @@ def process_apriori(
         "Transaction_ID",
         "Product_Name"
     ]
+
+    clean_data = clean_data.dropna(
+        subset=[
+            "Transaction_ID",
+            "Product_Name"
+        ]
+    )
 
     clean_data["Transaction_ID"] = (
         clean_data["Transaction_ID"]
@@ -1007,48 +1016,55 @@ def process_apriori(
             "Transaction_ID",
             "Product_Name"
         ]
-    )
+    ).reset_index(drop=True)
 
     if clean_data.empty:
         raise ValueError(
             "Dataset Apriori tidak memiliki transaksi valid."
         )
 
-    total_transactions = int(
-        clean_data["Transaction_ID"].nunique()
+    # Ubah ID transaksi dan nama produk menjadi kode integer.
+    # Cara ini menghindari pembuatan list Python per transaksi.
+    transaction_codes, transaction_names = pd.factorize(
+        clean_data["Transaction_ID"],
+        sort=False
     )
-    total_products = int(
-        clean_data["Product_Name"].nunique()
-    )
-
-    # Bentuk daftar produk pada setiap transaksi.
-    transactions = (
-        clean_data.groupby(
-            "Transaction_ID",
-            sort=False
-        )["Product_Name"]
-        .agg(list)
-        .tolist()
+    product_codes, product_names = pd.factorize(
+        clean_data["Product_Name"],
+        sort=False
     )
 
-    if not transactions:
+    total_transactions = len(transaction_names)
+    total_products = len(product_names)
+
+    if total_transactions == 0 or total_products == 0:
         raise ValueError(
             "Keranjang transaksi tidak berhasil dibentuk."
         )
 
-    transaction_encoder = TransactionEncoder()
-    encoded_sparse = (
-        transaction_encoder
-        .fit(transactions)
-        .transform(
-            transactions,
-            sparse=True
-        )
+    # Bentuk matriks transaksi-produk langsung dalam format CSR sparse.
+    encoded_sparse = csr_matrix(
+        (
+            np.ones(
+                len(clean_data),
+                dtype=np.uint8
+            ),
+            (transaction_codes, product_codes)
+        ),
+        shape=(
+            total_transactions,
+            total_products
+        ),
+        dtype=np.uint8
     )
+
+    # Pastikan setiap kombinasi transaksi-produk bernilai boolean.
+    encoded_sparse.data[:] = 1
+    encoded_sparse = encoded_sparse.astype(bool)
 
     basket_sets = pd.DataFrame.sparse.from_spmatrix(
         encoded_sparse,
-        columns=transaction_encoder.columns_
+        columns=product_names.astype(str)
     )
 
     app.logger.info(
@@ -1058,11 +1074,14 @@ def process_apriori(
         basket_sets.shape
     )
 
+    # Hasil aplikasi hanya memakai rule A -> B, sehingga itemset
+    # dengan panjang lebih dari 2 tidak diperlukan.
     frequent_itemsets = apriori(
         basket_sets,
         min_support=min_support,
         use_colnames=True,
-        low_memory=True
+        max_len=2,
+        low_memory=False
     )
 
     if frequent_itemsets.empty:
@@ -1083,8 +1102,6 @@ def process_apriori(
 
         del basket_sets
         del encoded_sparse
-        del transactions
-        del transaction_encoder
         del clean_data
         gc.collect()
 
@@ -1104,21 +1121,10 @@ def process_apriori(
     if not rules.empty:
         rules = rules[
             (rules["support"] >= min_support)
-            & (
-                rules["confidence"]
-                >= min_confidence
-            )
+            & (rules["confidence"] >= min_confidence)
             & (rules["lift"] > MIN_LIFT)
-            & (
-                rules["antecedents"]
-                .apply(len)
-                == 1
-            )
-            & (
-                rules["consequents"]
-                .apply(len)
-                == 1
-            )
+            & (rules["antecedents"].apply(len) == 1)
+            & (rules["consequents"].apply(len) == 1)
         ].copy()
 
     if not rules.empty:
@@ -1196,19 +1202,14 @@ def process_apriori(
         encoding="utf-8-sig"
     )
 
-    total_rules = len(rules_formatted)
-
     app.logger.info(
-        "Apriori selesai | frequent_itemsets=%s | rules=%s",
+        "Apriori selesai | frequent_itemsets=%s | aturan=%s",
         len(frequent_itemsets),
-        total_rules
+        len(rules_formatted)
     )
 
-    # Bersihkan objek besar sesudah hasil yang dibutuhkan selesai dibuat.
     del basket_sets
     del encoded_sparse
-    del transactions
-    del transaction_encoder
     del clean_data
     del frequent_itemsets
     del rules
@@ -1218,7 +1219,7 @@ def process_apriori(
         "rules_data": rules_formatted,
         "total_transactions": total_transactions,
         "total_products": total_products,
-        "total_rules": total_rules
+        "total_rules": len(rules_formatted)
     }
 
 
