@@ -598,10 +598,9 @@ def process_timeseries(data):
             )
 
             future_dates = pd.date_range(
-                start=product_series.index.max()
-                + pd.Timedelta(days=1),
-                periods=FORECAST_HORIZON,
-                freq="D"
+            start=pd.Timestamp("2027-01-10"),
+            periods=FORECAST_HORIZON,
+            freq="D"
             )
 
             
